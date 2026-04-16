@@ -1,5 +1,6 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Param } from '@nestjs/common';
 import { HealthService } from './health.service';
+import { NotFoundException } from '@nestjs/common';
 
 @Controller()
 export class HealthController {
@@ -8,5 +9,10 @@ export class HealthController {
   @Get()
   checkHealth() {
     return this.healthService.checkHealth();
+  }
+
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    throw new NotFoundException('User not found');
   }
 }
