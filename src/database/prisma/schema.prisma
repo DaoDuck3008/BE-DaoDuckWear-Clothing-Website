@@ -1,0 +1,339 @@
+// apps/daoduckwear_backend/src/database/prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// =========================
+// ENUMS
+// =========================
+enum UserRole {
+  user
+  admin
+
+  @@map("user_role")
+}
+
+enum OrderStatus {
+  pending
+  paid
+  shipped
+  delivered
+  cancelled
+
+  @@map("order_status")
+}
+
+enum PaymentStatus {
+  pending
+  success
+  failed
+
+  @@map("payment_status")
+}
+
+enum DiscountType {
+  percentage
+  fixed
+
+  @@map("discount_type")
+}
+
+// =========================
+// MODELS
+// =========================
+
+model User {
+  id        String    @id @default(uuid()) @db.Uuid
+  email     String    @unique @db.VarChar(255)
+  password  String    @db.Text
+  role      UserRole? @default(user)
+
+  createdAt DateTime? @default(now()) @map("created_at")
+  updatedAt DateTime? @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  addresses Address[]
+  carts     Cart[]
+  orders    Order[]
+  reviews   Review[]
+  posts     Post[]
+  auditLogs AuditLog[]
+
+  @@map("users")
+}
+
+model Address {
+  id          String  @id @default(uuid()) @db.Uuid
+  userId      String? @map("user_id") @db.Uuid
+  fullAddress String  @map("full_address") @db.Text
+  phone       String? @db.VarChar(20)
+
+  createdAt DateTime? @default(now()) @map("created_at")
+  updatedAt DateTime? @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  // Xóa User thì địa chỉ biến mất theo
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("addresses")
+}
+
+model Category {
+  id       String  @id @default(uuid()) @db.Uuid
+  name     String  @db.VarChar(255)
+  parentId String? @map("parent_id") @db.Uuid
+
+  createdAt DateTime? @default(now()) @map("created_at")
+  updatedAt DateTime? @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  parent   Category?  @relation("CategoryToCategory", fields: [parentId], references: [id], onDelete: SetNull)
+  children Category[] @relation("CategoryToCategory")
+  products Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id          String  @id @default(uuid()) @db.Uuid
+  name        String  @db.VarChar(255)
+  slug        String  @unique @db.VarChar(255)
+  description String? @db.Text
+  basePrice   Int     @map("base_price")
+  categoryId  String? @map("category_id") @db.Uuid
+  status      String? @default("active") @db.VarChar(50)
+
+  createdAt DateTime? @default(now()) @map("created_at")
+  updatedAt DateTime? @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  // Không cho xóa Category nếu vẫn còn Product
+  category Category?        @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  variants ProductVariant[]
+  images   ProductImage[]
+  reviews  Review[]
+
+  @@map("products")
+}
+
+model ProductVariant {
+  id        String  @id @default(uuid()) @db.Uuid
+  productId String? @map("product_id") @db.Uuid
+  size      String? @db.VarChar(10)
+  color     String? @db.VarChar(50)
+  price     Int?
+  sku       String  @unique @db.VarChar(100)
+
+  createdAt DateTime? @default(now()) @map("created_at")
+  updatedAt DateTime? @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  // Xóa sản phẩm thì các biến thể (S, M, L) mất theo
+  product    Product?    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  inventory  Inventory?
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+
+  @@map("product_variants")
+}
+
+model ProductImage {
+  id        String   @id @default(uuid()) @db.Uuid
+  productId String?  @map("product_id") @db.Uuid
+  url       String   @db.Text
+  isMain    Boolean? @default(false) @map("is_main")
+
+  createdAt DateTime? @default(now()) @map("created_at")
+  updatedAt DateTime? @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  // Xóa sản phẩm thì ảnh phải mất theo
+  product Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("product_images")
+}
+
+model Inventory {
+  id               String @id @default(uuid()) @db.Uuid
+  variantId        String @unique @map("variant_id") @db.Uuid
+  quantity         Int    @default(0)
+  reservedQuantity Int    @default(0) @map("reserved_quantity")
+
+  createdAt DateTime? @default(now()) @map("created_at")
+  updatedAt DateTime? @default(now()) @updatedAt @map("updated_at")
+
+  // Xóa biến thể thì thông tin kho cũng mất
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@map("inventories")
+}
+
+model Cart {
+  id     String  @id @default(uuid()) @db.Uuid
+  userId String? @map("user_id") @db.Uuid
+
+  createdAt DateTime? @default(now()) @map("created_at")
+  updatedAt DateTime? @default(now()) @updatedAt @map("updated_at")
+
+  // Xóa User thì giỏ hàng mất
+  user  User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items CartItem[]
+
+  @@map("carts")
+}
+
+model CartItem {
+  id        String  @id @default(uuid()) @db.Uuid
+  cartId    String? @map("cart_id") @db.Uuid
+  variantId String? @map("variant_id") @db.Uuid
+  quantity  Int
+
+  createdAt DateTime? @default(now()) @map("created_at")
+  updatedAt DateTime? @default(now()) @updatedAt @map("updated_at")
+
+  cart    Cart?           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@map("cart_items")
+}
+
+model Order {
+  id              String       @id @default(uuid()) @db.Uuid
+  userId          String?      @map("user_id") @db.Uuid
+  totalAmount     Int          @map("total_amount")
+  status          OrderStatus? @default(pending)
+  addressSnapshot Json         @map("address_snapshot")
+
+  createdAt DateTime? @default(now()) @map("created_at")
+  updatedAt DateTime? @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  // Quan trọng: Không cho xóa User nếu họ đã có đơn hàng (để giữ lịch sử kế toán)
+  user     User?           @relation(fields: [userId], references: [id], onDelete: Restrict)
+  items    OrderItem[]
+  payment  Payment?
+  vouchers OrderVoucher[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id              String @id @default(uuid()) @db.Uuid
+  orderId         String @map("order_id") @db.Uuid
+  variantId       String @map("variant_id") @db.Uuid
+  quantity        Int
+  priceAtPurchase Int    @map("price_at_purchase")
+
+  createdAt DateTime? @default(now()) @map("created_at")
+  updatedAt DateTime? @default(now()) @updatedAt @map("updated_at")
+
+  order   Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  // Không cho xóa Sản phẩm/Biến thể nếu nó đã nằm trong một đơn hàng cũ
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
+
+  @@map("order_items")
+}
+
+model Payment {
+  id            String         @id @default(uuid()) @db.Uuid
+  orderId       String         @unique @map("order_id") @db.Uuid
+  method        String?        @db.VarChar(50)
+  amount        Int
+  status        PaymentStatus? @default(pending)
+  transactionId String?        @map("transaction_id") @db.VarChar(255)
+
+  createdAt DateTime? @default(now()) @map("created_at")
+  updatedAt DateTime? @default(now()) @updatedAt @map("updated_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
+model Voucher {
+  id            String       @id @default(uuid()) @db.Uuid
+  code          String       @unique @db.VarChar(100)
+  discountType  DiscountType @map("discount_type")
+  discountValue Int          @map("discount_value")
+  minOrderValue Int?         @map("min_order_value")
+  expiredAt     DateTime?    @map("expired_at")
+
+  createdAt DateTime? @default(now()) @map("created_at")
+  updatedAt DateTime? @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  orders OrderVoucher[]
+
+  @@map("vouchers")
+}
+
+model OrderVoucher {
+  orderId   String @map("order_id") @db.Uuid
+  voucherId String @map("voucher_id") @db.Uuid
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  voucher Voucher @relation(fields: [voucherId], references: [id], onDelete: Restrict)
+
+  @@id([orderId, voucherId])
+  @@map("order_vouchers")
+}
+
+model Review {
+  id        String  @id @default(uuid()) @db.Uuid
+  userId    String? @map("user_id") @db.Uuid
+  productId String? @map("product_id") @db.Uuid
+  rating    Int?
+  comment   String? @db.Text
+
+  createdAt DateTime? @default(now()) @map("created_at")
+  updatedAt DateTime? @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  // Xóa User thì Review thành "Ẩn danh" (SetNull)
+  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  // Xóa sản phẩm thì xóa sạch review của nó
+  product Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("reviews")
+}
+
+model Post {
+  id       String  @id @default(uuid()) @db.Uuid
+  title    String  @db.VarChar(255)
+  slug     String  @unique @db.VarChar(255)
+  content  String? @db.Text
+  authorId String? @map("author_id") @db.Uuid
+
+  createdAt DateTime? @default(now()) @map("created_at")
+  updatedAt DateTime? @default(now()) @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  // Xóa Tác giả thì bài Post hiện "vô danh"
+  author User? @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@map("posts")
+}
+
+model AuditLog {
+  id         String  @id @default(uuid()) @db.Uuid
+  userId     String? @map("user_id") @db.Uuid
+  action     String  @db.VarChar(50)
+  entityName String  @map("entity_name") @db.VarChar(100)
+  entityId   String? @map("entity_id") @db.Uuid
+  oldData    Json?   @map("old_data")
+  newData    Json?   @map("new_data")
+  ipAddress  String? @map("ip_address")
+  userAgent  String? @map("user_agent") @db.Text
+
+  createdAt DateTime? @default(now()) @map("created_at")
+
+  // Xóa User thì vẫn giữ Log để truy vết sau này
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("audit_logs")
+}
