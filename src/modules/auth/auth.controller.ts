@@ -21,7 +21,17 @@ export class AuthController {
 
   @Post('register')
   async register(@Body() body: RegisterDto) {
-    return this.authService.register(body);
+    const user = await this.authService.register(body);
+    return {
+      success: true,
+      message: 'User registered successfully',
+      user: {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        role: user.role,
+      },
+    };
   }
 
   @Post('login')
@@ -46,7 +56,13 @@ export class AuthController {
     return {
       success: true,
       message: 'User logged in successfully',
-      data: accessToken,
+      accessToken: accessToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        role: user.role,
+      },
     };
   }
 
