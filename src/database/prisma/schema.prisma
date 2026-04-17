@@ -12,33 +12,33 @@ datasource db {
 // ENUMS
 // =========================
 enum UserRole {
-  user
-  admin
+  USER
+  ADMIN
 
   @@map("user_role")
 }
 
 enum OrderStatus {
-  pending
-  paid
-  shipped
-  delivered
-  cancelled
+  PENDING
+  PAID
+  SHIPPED
+  DELIVERED
+  CANCELLED
 
   @@map("order_status")
 }
 
 enum PaymentStatus {
-  pending
-  success
-  failed
+  PENDING
+  SUCCESS
+  FAILED
 
   @@map("payment_status")
 }
 
 enum DiscountType {
-  percentage
-  fixed
+  PERCENTAGE
+  FIXED
 
   @@map("discount_type")
 }
@@ -49,9 +49,10 @@ enum DiscountType {
 
 model User {
   id        String    @id @default(uuid()) @db.Uuid
+  username  String    @unique @db.VarChar(255) @map("username")
   email     String    @unique @db.VarChar(255)
   password  String    @db.Text
-  role      UserRole? @default(user)
+  role      UserRole? @default(USER)
 
   createdAt DateTime? @default(now()) @map("created_at")
   updatedAt DateTime? @default(now()) @updatedAt @map("updated_at")
@@ -206,7 +207,7 @@ model Order {
   id              String       @id @default(uuid()) @db.Uuid
   userId          String?      @map("user_id") @db.Uuid
   totalAmount     Int          @map("total_amount")
-  status          OrderStatus? @default(pending)
+  status          OrderStatus? @default(PENDING)
   addressSnapshot Json         @map("address_snapshot")
 
   createdAt DateTime? @default(now()) @map("created_at")
@@ -244,7 +245,7 @@ model Payment {
   orderId       String         @unique @map("order_id") @db.Uuid
   method        String?        @db.VarChar(50)
   amount        Int
-  status        PaymentStatus? @default(pending)
+  status        PaymentStatus? @default(PENDING)
   transactionId String?        @map("transaction_id") @db.VarChar(255)
 
   createdAt DateTime? @default(now()) @map("created_at")

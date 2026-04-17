@@ -6,10 +6,13 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Request, Response } from 'express';
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
+  constructor(private readonly configService: ConfigService) {}
+
   private readonly logger = new Logger(HttpExceptionFilter.name);
 
   catch(exception: unknown, host: ArgumentsHost) {
@@ -53,6 +56,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
     this.logger.error(
       `${request.method} ${request.originalUrl} ${statusCode} - ${message}`,
     );
+
+    if (
+      this.configService.get<string>('ENV') === 'development' &&
+      (message === 'Internal server error' ||
+        message === 'Internal Server Error')
+    ) {
+      console.log(exception);
+    }
 
     response.status(statusCode).json(errorResponse);
   }
