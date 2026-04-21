@@ -4,6 +4,9 @@ import { HealthModule } from './modules/health/health.module';
 import { PrismaModule } from './database/prisma/prisma.module';
 import { UsersModule } from './modules/users/users.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { CloudinaryModule } from './modules/cloudinary/cloudinary.module';
+import { CategoriesModule } from './modules/categories/categories.module';
+import { ProductsModule } from './modules/products/products.module';
 
 @Module({
   imports: [
@@ -11,6 +14,9 @@ import { AuthModule } from './modules/auth/auth.module';
     PrismaModule,
     AuthModule,
     UsersModule,
+    CloudinaryModule,
+    CategoriesModule,
+    ProductsModule,
     HealthModule,
   ],
   controllers: [],

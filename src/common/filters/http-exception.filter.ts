@@ -64,6 +64,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
     ) {
       console.log(exception);
     }
+    if (this.configService.get<string>('ENV') === 'development') {
+      console.log(exception);
+    }
 
     response.status(statusCode).json(errorResponse);
   }
