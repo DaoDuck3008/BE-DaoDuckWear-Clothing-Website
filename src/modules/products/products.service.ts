@@ -131,4 +131,29 @@ export class ProductsService {
       },
     );
   }
+
+  async findBySlug(slug: string) {
+    const product = await this.prisma.product.findUnique({
+      where: { slug },
+      include: {
+        category: true,
+        images: {
+          orderBy: {
+            createdAt: 'asc',
+          },
+        },
+        variants: {
+          include: {
+            inventory: true,
+          },
+        },
+      },
+    });
+
+    if (!product) {
+      throw new BadRequestException('Sản phẩm không tồn tại');
+    }
+
+    return product;
+  }
 }

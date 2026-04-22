@@ -5,6 +5,8 @@ import {
   UseInterceptors,
   UploadedFiles,
   UseGuards,
+  Get,
+  Param,
 } from '@nestjs/common';
 import { AnyFilesInterceptor } from '@nestjs/platform-express';
 import { ProductsService } from './products.service';
@@ -38,5 +40,10 @@ export class ProductsController {
     };
 
     return this.productsService.create(createProductDto, files);
+  }
+
+  @Get(':slug')
+  async findOne(@Param('slug') slug: string) {
+    return this.productsService.findBySlug(slug);
   }
 }
