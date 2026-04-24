@@ -34,11 +34,6 @@ export class CartService {
             },
           },
         },
-        inventory: {
-          select: {
-            quantity: true,
-          },
-        },
       },
     },
   };
@@ -78,9 +73,9 @@ export class CartService {
 
     const variant = await this.prisma.productVariant.findUnique({
       where: { id: variantId },
-      select: { 
-        id: true, 
-        inventory: { select: { quantity: true } } 
+      select: {
+        id: true,
+        inventories: { select: { quantity: true } },
       },
     });
 
@@ -88,8 +83,12 @@ export class CartService {
       throw new NotFoundException('Không tìm thấy sản phẩm này');
     }
 
-    const availableStock = variant.inventory?.quantity || 0;
-    
+    // Tính tổng số lượng hàng tồn kho từ tất cả các kho
+    const availableStock = variant.inventories.reduce(
+      (total, inventory) => total + inventory.quantity,
+      0,
+    );
+
     const existingItem = await this.prisma.cartItem.findUnique({
       where: {
         cartId_variantId: {
@@ -97,7 +96,7 @@ export class CartService {
           variantId,
         },
       },
-      select: { id: true, quantity: true }
+      select: { id: true, quantity: true },
     });
 
     const newQuantity = existingItem
@@ -133,12 +132,12 @@ export class CartService {
 
   async updateQuantity(userId: string, itemId: string, dto: UpdateCartItemDto) {
     const { quantity } = dto;
-    
+
     const item = await this.prisma.cartItem.findUnique({
       where: { id: itemId },
       select: {
         cart: { select: { userId: true } },
-        variant: { select: { inventory: { select: { quantity: true } } } },
+        variant: { select: { inventories: { select: { quantity: true } } } },
       },
     });
 
@@ -146,7 +145,10 @@ export class CartService {
       throw new NotFoundException('Không tìm thấy sản phẩm trong giỏ hàng');
     }
 
-    const availableStock = item.variant.inventory?.quantity || 0;
+    const availableStock = item.variant.inventories.reduce(
+      (total, inventory) => total + inventory.quantity,
+      0,
+    );
     if (quantity > availableStock) {
       throw new BadRequestException(
         `Không đủ hàng trong kho. Còn lại: ${availableStock}`,
@@ -178,7 +180,7 @@ export class CartService {
   async clearCart(userId: string) {
     const cart = await this.prisma.cart.findUnique({
       where: { userId },
-      select: { id: true }
+      select: { id: true },
     });
 
     if (!cart) return;

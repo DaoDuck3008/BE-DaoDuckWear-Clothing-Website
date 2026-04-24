@@ -14,8 +14,15 @@ export class ProductsService {
     createProductDto: CreateProductDto,
     files: Express.Multer.File[],
   ) {
-    const { name, categoryId, basePrice, description, status, variants } =
-      createProductDto;
+    const {
+      name,
+      categoryId,
+      shopId,
+      basePrice,
+      description,
+      status,
+      variants,
+    } = createProductDto;
 
     // 1. Tạo Slug đơn giản
     const slug =
@@ -106,6 +113,7 @@ export class ProductsService {
           await tx.inventory.create({
             data: {
               variantId: variant.id,
+              shopId: shopId,
               quantity: Number(v.stock),
             },
           });
@@ -144,7 +152,11 @@ export class ProductsService {
         },
         variants: {
           include: {
-            inventory: true,
+            inventories: {
+              include: {
+                shop: true,
+              },
+            },
           },
         },
       },

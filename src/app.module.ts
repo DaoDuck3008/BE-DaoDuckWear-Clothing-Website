@@ -8,6 +8,7 @@ import { CloudinaryModule } from './modules/cloudinary/cloudinary.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { ProductsModule } from './modules/products/products.module';
 import { CartModule } from './modules/cart/cart.module';
+import { ShopsModule } from './modules/shops/shops.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { CartModule } from './modules/cart/cart.module';
     CategoriesModule,
     ProductsModule,
     CartModule,
+    ShopsModule,
     HealthModule,
   ],
   controllers: [],

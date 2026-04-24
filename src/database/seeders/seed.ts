@@ -12,19 +12,66 @@ async function main() {
 
   try {
     // 1. Xóa dữ liệu cũ (Tùy chọn, cẩn thận khi dùng)
+    console.log('- Đang xóa dữ liệu cũ...');
     await prisma.category.deleteMany();
     await prisma.user.deleteMany();
+    await prisma.role.deleteMany();
+    await prisma.shop.deleteMany();
 
-    // 2. Seed Users
+    // 2. Seed Shops
+    console.log('- Đang tạo shops...');
+    const shopsData = [
+      { name: 'DaoDuck Wear - Chi nhánh Hà Nội', slug: 'daoduck-hanoi', cityName: 'Hà Nội', cityCode: 1 },
+      { name: 'DaoDuck Wear - Chi nhánh TP.HCM', slug: 'daoduck-hcm', cityName: 'TP. Hồ Chí Minh', cityCode: 79 },
+      { name: 'DaoDuck Wear - Chi nhánh Đà Nẵng', slug: 'daoduck-danang', cityName: 'Đà Nẵng', cityCode: 48 },
+    ];
+
+    const shopMap = new Map<string, string>();
+    for (const s of shopsData) {
+      const created = await prisma.shop.create({ data: s });
+      shopMap.set(s.slug, created.id);
+    }
+    console.log('- Đang tạo roles...');
+    const roles = ['USER', 'STAFF', 'MANAGER', 'ADMIN'];
+    const roleMap = new Map<string, string>();
+
+    for (const roleName of roles) {
+      const createdRole = await prisma.role.create({
+        data: { name: roleName },
+      });
+      roleMap.set(roleName, createdRole.id);
+    }
+
+    // 3. Seed Users
     const passwordHash = await bcrypt.hash('123456', 10);
     console.log('- Đang tạo users...');
-    for (let i = 1; i <= 10; i++) {
+    
+    // Tạo 1 ADMIN, 1 MANAGER, 1 STAFF và các USER
+    const usersToCreate = [
+      { username: 'admin', email: 'admin@daoduck.com', role: 'ADMIN' },
+      { username: 'manager', email: 'manager@daoduck.com', role: 'MANAGER' },
+      { username: 'staff', email: 'staff@daoduck.com', role: 'STAFF' },
+    ];
+
+    for (const u of usersToCreate) {
+      await prisma.user.create({
+        data: {
+          username: u.username,
+          email: u.email,
+          password: passwordHash,
+          roleId: roleMap.get(u.role),
+        },
+      });
+    }
+
+    // Tạo thêm 7 users bình thường
+    for (let i = 1; i <= 7; i++) {
       await prisma.user.create({
         data: {
           username: `user${i}`,
           email: `user${i}@daoduck.com`,
           password: passwordHash,
-          role: i === 1 ? 'ADMIN' : 'USER',
+          roleId: roleMap.get('USER'),
         },
       });
     }

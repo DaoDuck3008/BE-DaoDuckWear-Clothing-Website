@@ -26,6 +26,9 @@ export class AuthService {
       where: {
         OR: [{ email }, { username }],
       },
+      include: {
+        role: true,
+      },
     });
 
     if (user) {
@@ -34,12 +37,23 @@ export class AuthService {
 
     const hashedPassword = await hashPassword(password);
 
+    const role = await this.prismaService.role.findUnique({
+      where: { name: 'USER' },
+    });
+
+    if (!role) {
+      throw new NotFoundException('Không tìm thấy vai trò USER');
+    }
+
     const userCreated = await this.prismaService.user.create({
       data: {
         email,
         username,
         password: hashedPassword,
-        role: 'USER',
+        roleId: role.id,
+      },
+      include: {
+        role: true,
       },
     });
 
@@ -51,20 +65,26 @@ export class AuthService {
 
     const user = await this.prismaService.user.findUnique({
       where: { email },
+      include: {
+        role: true,
+      },
     });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException('Email hoặc mật khẩu không chính xác');
     }
 
     const isPasswordValid = await comparePassword(password, user.password);
 
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Wrong email or password');
+      throw new UnauthorizedException('Email hoặc mật khẩu không chính xác');
     }
 
-    const accessToken = signAccessToken({ id: user.id, role: user.role });
-    const refreshToken = signRefreshToken({ id: user.id, role: user.role });
+    const accessToken = signAccessToken({ id: user.id, role: user.role!.name });
+    const refreshToken = signRefreshToken({
+      id: user.id,
+      role: user.role!.name,
+    });
 
     return { user, accessToken, refreshToken };
   }
@@ -73,12 +93,18 @@ export class AuthService {
     const decodedToken = verifyRefreshToken(refreshToken);
     const user = await this.prismaService.user.findUnique({
       where: { id: decodedToken.id },
+      include: {
+        role: true,
+      },
     });
     if (!user) {
       throw new UnauthorizedException('User not found');
     }
-    const accessToken = signAccessToken({ id: user.id, role: user.role });
-    const newRefreshToken = signRefreshToken({ id: user.id, role: user.role });
+    const accessToken = signAccessToken({ id: user.id, role: user.role!.name });
+    const newRefreshToken = signRefreshToken({
+      id: user.id,
+      role: user.role!.name,
+    });
     return { user, accessToken, refreshToken: newRefreshToken };
   }
 }

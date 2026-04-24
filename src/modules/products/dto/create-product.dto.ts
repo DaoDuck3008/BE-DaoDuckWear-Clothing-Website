@@ -26,6 +26,7 @@ export class CreateProductVariantDto {
 
   @IsNumber()
   @Type(() => Number)
+  @IsNotEmpty({ message: 'Vui lòng nhập số lượng tồn kho' })
   stock!: number;
 }
 
@@ -42,7 +43,12 @@ export class CreateProductDto {
   @IsNotEmpty({ message: 'Danh mục không được để trống' })
   categoryId!: string;
 
+  @IsString()
+  @IsNotEmpty({ message: 'Vui lòng chọn cửa hàng' })
+  shopId!: string;
+
   @IsNumber()
+  @IsNotEmpty({ message: 'Vui lòng nhập giá cơ bản' })
   @Type(() => Number)
   basePrice!: number;
 

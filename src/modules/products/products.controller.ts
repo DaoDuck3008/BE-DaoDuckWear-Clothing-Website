@@ -14,7 +14,6 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { AuthGuard } from '../../common/guards/auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
-import { UserRole } from '@prisma/client';
 
 @Controller('products')
 export class ProductsController {
@@ -22,7 +21,7 @@ export class ProductsController {
 
   @Post()
   @UseGuards(AuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles('ADMIN')
   @UseInterceptors(AnyFilesInterceptor())
   async create(
     @Body() body: any,
