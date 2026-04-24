@@ -9,6 +9,7 @@ import { CategoriesModule } from './modules/categories/categories.module';
 import { ProductsModule } from './modules/products/products.module';
 import { CartModule } from './modules/cart/cart.module';
 import { ShopsModule } from './modules/shops/shops.module';
+import { FavoritesModule } from './modules/favorites/favorites.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { ShopsModule } from './modules/shops/shops.module';
     ProductsModule,
     CartModule,
     ShopsModule,
+    FavoritesModule,
     HealthModule,
   ],
   controllers: [],
