@@ -10,6 +10,7 @@ import { ProductsModule } from './modules/products/products.module';
 import { CartModule } from './modules/cart/cart.module';
 import { ShopsModule } from './modules/shops/shops.module';
 import { FavoritesModule } from './modules/favorites/favorites.module';
+import { ColorsModule } from './modules/colors/colors.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { FavoritesModule } from './modules/favorites/favorites.module';
     CartModule,
     ShopsModule,
     FavoritesModule,
+    ColorsModule,
     HealthModule,
   ],
   controllers: [],

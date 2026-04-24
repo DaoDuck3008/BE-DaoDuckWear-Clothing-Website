@@ -17,6 +17,7 @@ async function main() {
     await prisma.user.deleteMany();
     await prisma.role.deleteMany();
     await prisma.shop.deleteMany();
+    await prisma.color.deleteMany();
 
     // 2. Seed Shops
     console.log('- Đang tạo shops...');
@@ -76,7 +77,7 @@ async function main() {
       });
     }
 
-    // 3. Seed Categories
+    // 4. Seed Categories
     console.log('- Đang tạo categories...');
     const categoriesData = [
       { name: 'Áo', parentId: null },
@@ -123,6 +124,37 @@ async function main() {
           },
         });
       }
+    }
+
+    // 5. Seed Colors
+    console.log('- Đang tạo colors...');
+    const colorsData = [
+      { "name": "Đen", "slug": "den", "hexCode": "#000000" },
+      { "name": "Trắng", "slug": "trang", "hexCode": "#FFFFFF" },
+      { "name": "Navy", "slug": "navy", "hexCode": "#1B2A49" },
+      { "name": "Xám", "slug": "xam", "hexCode": "#808080" },
+      { "name": "Xám Đậm", "slug": "xam-dam", "hexCode": "#555555" },
+      { "name": "Xám Nhạt", "slug": "xam-nhat", "hexCode": "#BFC3C7" },
+      { "name": "Be", "slug": "be", "hexCode": "#D8D0C5" },
+      { "name": "Kem", "slug": "kem", "hexCode": "#F4EBD0" },
+      { "name": "Nâu", "slug": "nau", "hexCode": "#6B4F3A" },
+      { "name": "Nâu Gỗ Sồi", "slug": "nau-go-soi", "hexCode": "#8B5A2B" },
+      { "name": "Nâu Đậm", "slug": "nau-dam", "hexCode": "#4A3426" },
+      { "name": "Đỏ", "slug": "do", "hexCode": "#B22222" },
+      { "name": "Đỏ Maroon", "slug": "do-maroon", "hexCode": "#800000" },
+      { "name": "Xanh Rêu", "slug": "xanh-reu", "hexCode": "#556B2F" },
+      { "name": "Xanh Lá", "slug": "xanh-la", "hexCode": "#2E8B57" },
+      { "name": "Xanh Dương", "slug": "xanh-duong", "hexCode": "#1565C0" },
+      { "name": "Xanh Da Trời", "slug": "xanh-da-troi", "hexCode": "#87CEEB" },
+      { "name": "Vàng", "slug": "vang", "hexCode": "#D4AF37" },
+      { "name": "Cam", "slug": "cam", "hexCode": "#E67E22" },
+      { "name": "Tím", "slug": "tim", "hexCode": "#6A0DAD" }
+    ];
+
+    for (const color of colorsData) {
+      await prisma.color.create({
+        data: color,
+      });
     }
 
     console.log('✅ Seed hoàn tất thành công!');
