@@ -16,6 +16,10 @@ export class CreateProductVariantDto {
   @IsString()
   color!: string;
 
+  @IsString()
+  @IsOptional()
+  colorHexId?: string;
+
   @IsNumber()
   @IsOptional()
   @Type(() => Number)

@@ -1,16 +1,15 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../database/prisma/prisma.service';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { Shop, ShopDocument } from './schemas/shop.schema';
 
 @Injectable()
 export class ShopsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @InjectModel(Shop.name) private readonly shopModel: Model<ShopDocument>,
+  ) {}
 
   async findAll() {
-    return this.prisma.shop.findMany({
-      where: {
-        deletedAt: null,
-      },
-      orderBy: { name: 'desc' },
-    });
+    return this.shopModel.find({ deletedAt: null }).sort({ name: -1 });
   }
 }

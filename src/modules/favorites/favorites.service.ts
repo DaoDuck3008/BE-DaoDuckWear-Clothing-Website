@@ -2,50 +2,52 @@ import {
   Injectable,
   ConflictException,
   NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
-import { PrismaService } from 'src/database/prisma/prisma.service';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model, Types } from 'mongoose';
+import { Favorite } from './schemas/favorite.schema';
+import { Product } from '../products/schemas/product.schema';
 
 @Injectable()
 export class FavoritesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    @InjectModel(Favorite.name)
+    private readonly favoriteModel: Model<any>,
+    @InjectModel(Product.name) private readonly productModel: Model<any>,
+  ) {}
 
   async getFavorites(userId: string) {
-    return this.prisma.favorite.findMany({
-      where: { userId },
-      include: {
-        product: {
-          include: {
-            images: {
-              where: { isMain: true },
-              take: 1,
-            },
-          },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    const favorites = await this.favoriteModel
+      .find({ userId: this.toObjectId(userId) })
+      .sort({ createdAt: -1 });
+
+    return Promise.all(
+      favorites.map(async (favorite) => ({
+        ...favorite.toJSON(),
+        product: await this.mapFavoriteProduct(favorite.productId.toString()),
+      })),
+    );
   }
 
   async addFavorite(userId: string, productId: string) {
+    const product = await this.productModel.findById(productId);
+    if (!product) {
+      throw new NotFoundException('Sản phẩm không tồn tại');
+    }
+
     try {
-      return await this.prisma.favorite.create({
-        data: {
-          userId,
-          productId,
-        },
-        include: {
-          product: {
-            include: {
-              images: {
-                where: { isMain: true },
-                take: 1,
-              },
-            },
-          },
-        },
+      const favorite = await this.favoriteModel.create({
+        userId: this.toObjectId(userId),
+        productId: this.toObjectId(productId),
       });
+
+      return {
+        ...favorite.toJSON(),
+        product: this.mapProduct(product),
+      };
     } catch (error: any) {
-      if (error.code === 'P2002') {
+      if (error.code === 11000) {
         throw new ConflictException('Sản phẩm đã có trong danh sách yêu thích');
       }
       throw error;
@@ -53,13 +55,9 @@ export class FavoritesService {
   }
 
   async removeFavorite(userId: string, productId: string) {
-    const favorite = await this.prisma.favorite.findUnique({
-      where: {
-        userId_productId: {
-          userId,
-          productId,
-        },
-      },
+    const favorite = await this.favoriteModel.findOneAndDelete({
+      userId: this.toObjectId(userId),
+      productId: this.toObjectId(productId),
     });
 
     if (!favorite) {
@@ -68,31 +66,39 @@ export class FavoritesService {
       );
     }
 
-    return this.prisma.favorite.delete({
-      where: {
-        userId_productId: {
-          userId,
-          productId,
-        },
-      },
-    });
+    return favorite;
   }
 
-  async clearFavorites(userId: string) {
-    return this.prisma.favorite.deleteMany({
-      where: { userId },
-    });
+  async clearFavorites(userId: string): Promise<any> {
+    return this.favoriteModel.deleteMany({ userId: this.toObjectId(userId) });
   }
 
   async checkIsFavorite(userId: string, productId: string) {
-    const favorite = await this.prisma.favorite.findUnique({
-      where: {
-        userId_productId: {
-          userId,
-          productId,
-        },
-      },
+    const favorite = await this.favoriteModel.exists({
+      userId: this.toObjectId(userId),
+      productId: this.toObjectId(productId),
     });
     return !!favorite;
+  }
+
+  private async mapFavoriteProduct(productId: string) {
+    const product = await this.productModel.findById(productId);
+    if (!product) return null;
+    return this.mapProduct(product);
+  }
+
+  private mapProduct(product: any) {
+    const productJson = product.toJSON() as Record<string, any>;
+    return {
+      ...productJson,
+      images: product.images.filter((image) => image.isMain).slice(0, 1),
+    };
+  }
+
+  private toObjectId(id: string) {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('ID không hợp lệ');
+    }
+    return new Types.ObjectId(id);
   }
 }

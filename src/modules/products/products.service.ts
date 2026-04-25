@@ -1,12 +1,21 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../../database/prisma/prisma.service';
+import { InjectConnection, InjectModel } from '@nestjs/mongoose';
+import { Connection, Model, Types } from 'mongoose';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { CreateProductDto } from './dto/create-product.dto';
+import { Product } from './schemas/product.schema';
+import { ProductVariant } from './schemas/product-variant.schema';
+import { Inventory } from './schemas/inventory.schema';
 
 @Injectable()
 export class ProductsService {
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectConnection() private readonly connection: Connection,
+    @InjectModel(Product.name) private readonly productModel: Model<any>,
+    @InjectModel(ProductVariant.name)
+    private readonly variantModel: Model<any>,
+    @InjectModel(Inventory.name)
+    private readonly inventoryModel: Model<any>,
     private readonly cloudinary: CloudinaryService,
   ) {}
 
@@ -24,28 +33,30 @@ export class ProductsService {
       variants,
     } = createProductDto;
 
-    // 1. Tạo Slug đơn giản
     const slug =
       createProductDto.slug ||
       name
         .toLowerCase()
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[đĐ]/g, 'd')
+        .replace(/[Ä‘Ä]/g, 'd')
         .replace(/([^0-9a-z-\s])/g, '')
         .replace(/(\s+)/g, '-')
         .replace(/-+/g, '-')
         .replace(/^-+|-+$/g, '');
 
-    // Kiểm tra trùng slug
-    const existingProduct = await this.prisma.product.findFirst({
-      where: { slug },
-    });
+    const existingProduct = await this.productModel.exists({ slug });
     if (existingProduct) {
-      throw new BadRequestException('Sản phẩm với slug này đã tồn tại');
+      throw new BadRequestException('Sản phẩm đã tồn tại');
     }
 
-    // 4. Upload ảnh ngoài transaction trước để tránh timeout
+    const duplicatedSku = await this.variantModel.exists({
+      sku: { $in: variants.map((variant) => variant.sku) },
+    });
+    if (duplicatedSku) {
+      throw new BadRequestException('SKU đã tồn tại trong hệ thống');
+    }
+
     const uploadResults: any[] = [];
     if (files && files.length > 0) {
       for (const file of files) {
@@ -80,92 +91,115 @@ export class ProductsService {
       }
     }
 
-    // 5. Bắt đầu Transaction để lưu DB
-    return this.prisma.$transaction(
-      async (tx) => {
-        // Tạo Product
-        const product = await tx.product.create({
-          data: {
-            name,
-            slug,
-            categoryId,
-            basePrice,
-            description,
-            status: status || 'active',
-          },
-        });
-
-        // Tạo Biến thể và Tồn kho
-        for (const v of variants) {
-          const variantPrice = v.price ? Number(v.price) : Number(basePrice);
-          const upperColor = v.color.toUpperCase();
-
-          const variant = await tx.productVariant.create({
-            data: {
-              productId: product.id,
-              size: v.size,
-              color: upperColor,
-              price: variantPrice,
-              sku: v.sku,
+    const session = await this.connection.startSession();
+    try {
+      return await session.withTransaction(async () => {
+        const product = await this.productModel.create(
+          [
+            {
+              name,
+              slug,
+              categoryId: this.toObjectId(categoryId),
+              basePrice,
+              description,
+              status: status || 'active',
+              images: uploadResults,
             },
-          });
+          ],
+          { session },
+        );
 
-          await tx.inventory.create({
-            data: {
-              variantId: variant.id,
-              shopId: shopId,
-              quantity: Number(v.stock),
-            },
-          });
+        const createdProduct = product[0] as any;
+
+        for (const variantDto of variants) {
+          const variantPrice = variantDto.price
+            ? Number(variantDto.price)
+            : Number(basePrice);
+          const upperColor = variantDto.color.toUpperCase();
+
+          const variant = await this.variantModel.create(
+            [
+              {
+                productId: createdProduct._id,
+                size: variantDto.size,
+                color: upperColor,
+                colorHexId: variantDto.colorHexId
+                  ? this.toObjectId(variantDto.colorHexId)
+                  : null,
+                price: variantPrice,
+                sku: variantDto.sku,
+              },
+            ],
+            { session },
+          );
+
+          await this.inventoryModel.create(
+            [
+              {
+                variantId: (variant[0] as any)._id,
+                productId: createdProduct._id,
+                shopId: this.toObjectId(shopId),
+                quantity: Number(variantDto.stock),
+                reservedQuantity: 0,
+              },
+            ],
+            { session },
+          );
         }
 
-        // Lưu Image vào DB
-        for (const res of uploadResults) {
-          await tx.productImage.create({
-            data: {
-              productId: product.id,
-              url: res.url,
-              color: res.color,
-              isMain: res.isMain,
-              isThumbnail: res.isThumbnail,
-            },
-          });
-        }
-
-        return product;
-      },
-      {
-        timeout: 30000,
-      },
-    );
+        return createdProduct.toJSON();
+      });
+    } finally {
+      await session.endSession();
+    }
   }
 
   async findBySlug(slug: string) {
-    const product = await this.prisma.product.findUnique({
-      where: { slug },
-      include: {
-        category: true,
-        images: {
-          orderBy: {
-            createdAt: 'asc',
-          },
-        },
-        variants: {
-          include: {
-            inventories: {
-              include: {
-                shop: true,
-              },
-            },
-          },
-        },
-      },
-    });
+    const product = await this.productModel
+      .findOne({ slug, deletedAt: null })
+      .populate('categoryId');
 
     if (!product) {
       throw new BadRequestException('Sản phẩm không tồn tại');
     }
 
-    return product;
+    const variants = await this.variantModel
+      .find({ productId: product._id, deletedAt: null })
+      .sort({ createdAt: 1 });
+
+    const inventories = await this.inventoryModel
+      .find({ productId: product._id })
+      .populate('shopId');
+
+    const productJson = product.toJSON() as Record<string, any>;
+    const category = productJson.categoryId;
+    delete productJson.categoryId;
+
+    return {
+      ...productJson,
+      category,
+      variants: variants.map((variant) => {
+        const variantJson = variant.toJSON() as Record<string, any>;
+        variantJson.inventories = inventories
+          .filter((inventory) => inventory.variantId.toString() === variant.id)
+          .map((inventory) => {
+            const inventoryJson = inventory.toJSON() as Record<string, any>;
+            inventoryJson.shop = inventoryJson.shopId;
+            const shopId = inventory.shopId as any;
+            inventoryJson.shopId = shopId._id?.toString
+              ? shopId._id.toString()
+              : inventory.shopId.toString();
+            return inventoryJson;
+          });
+        return variantJson;
+      }),
+    };
+  }
+
+  private toObjectId(id: string) {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('ID không hợp lệ');
+    }
+    return new Types.ObjectId(id);
   }
 }

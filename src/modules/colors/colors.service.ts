@@ -1,13 +1,15 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from 'src/database/prisma/prisma.service';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { Color, ColorDocument } from './schemas/color.schema';
 
 @Injectable()
 export class ColorsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    @InjectModel(Color.name) private readonly colorModel: Model<ColorDocument>,
+  ) {}
 
   async findAll() {
-    return this.prisma.color.findMany({
-      orderBy: { name: 'asc' },
-    });
+    return this.colorModel.find().sort({ name: 1 });
   }
 }

@@ -1,26 +1,35 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../database/prisma/prisma.service';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { Category, CategoryDocument } from './schemas/category.schema';
 
 @Injectable()
 export class CategoriesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @InjectModel(Category.name)
+    private readonly categoryModel: Model<CategoryDocument>,
+  ) {}
 
   async findAllTree() {
-    const categories = await this.prisma.category.findMany({
-      orderBy: { name: 'asc' },
-    });
+    const categories = await this.categoryModel
+      .find({ deletedAt: null })
+      .sort({ name: 1 });
 
-    return this.buildTree(categories);
+    return this.buildTree(categories.map((category) => category.toJSON()));
   }
 
-  // Build tree structure from flat categories array
   private buildTree(categories: any[], parentId: string | null = null): any[] {
     return categories
-      .filter((cat) => cat.parentId === parentId)
-      .map((cat) => ({
-        id: cat.id,
-        name: cat.name,
-        children: this.buildTree(categories, cat.id),
+      .filter((category) => {
+        const categoryParentId = category.parentId
+          ? category.parentId.toString()
+          : null;
+        return categoryParentId === parentId;
+      })
+      .map((category) => ({
+        id: category.id,
+        name: category.name,
+        children: this.buildTree(categories, category.id),
       }));
   }
 }

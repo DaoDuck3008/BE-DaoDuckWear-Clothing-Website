@@ -1,18 +1,25 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../database/prisma/prisma.service';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { User, UserDocument } from './schemas/user.schema';
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
+  ) {}
 
   async findAll() {
-    return this.prisma.user.findMany({
-      select: {
-        id: true,
-        email: true,
-        role: true,
-        createdAt: true,
-      },
+    const users = await this.userModel
+      .find({ deletedAt: null })
+      .select('email roleId createdAt')
+      .populate('roleId');
+
+    return users.map((user) => {
+      const userJson = user.toJSON() as Record<string, any>;
+      userJson.role = userJson.roleId;
+      delete userJson.roleId;
+      return userJson;
     });
   }
 }

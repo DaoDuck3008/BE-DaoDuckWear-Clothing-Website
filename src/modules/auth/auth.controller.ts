@@ -78,7 +78,7 @@ export class AuthController {
   async logout(@Res({ passthrough: true }) res: Response) {
     res.clearCookie('refreshToken', {
       httpOnly: true,
-      secure: false,
+      secure: true,
       sameSite: 'lax',
     });
     return {
@@ -88,11 +88,14 @@ export class AuthController {
   }
 
   @Post('refresh')
-  async refresh(@Req() req: Request) {
+  async refresh(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     // get refresh token from cookie
     const token = req.cookies.refreshToken;
     if (!token) {
-      throw new UnauthorizedException('No refresh token found');
+      throw new UnauthorizedException('Không tìm thấy Refresh Token');
     }
     // refresh token
     const {
@@ -101,9 +104,16 @@ export class AuthController {
       refreshToken: newRefreshToken,
     } = await this.authService.refresh(token);
 
+    res.cookie('refreshToken', newRefreshToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
     return {
       success: true,
-      message: 'Token refreshed successfully',
+      message: 'Refresh Token successfully',
       accessToken: accessToken,
       user: {
         id: user.id,
