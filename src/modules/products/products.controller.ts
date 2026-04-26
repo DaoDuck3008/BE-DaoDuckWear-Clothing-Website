@@ -7,6 +7,7 @@ import {
   UseGuards,
   Get,
   Param,
+  Query,
 } from '@nestjs/common';
 import { AnyFilesInterceptor } from '@nestjs/platform-express';
 import { ProductsService } from './products.service';
@@ -27,8 +28,6 @@ export class ProductsController {
     @Body() body: any,
     @UploadedFiles() files: Express.Multer.File[],
   ) {
-    // Khi gửi qua FormData, các mảng object bị chuyển thành string JSON.
-    // Parse lại để class-validator hoạt động chính xác.
     const createProductDto: CreateProductDto = {
       ...body,
       variants:
@@ -39,6 +38,11 @@ export class ProductsController {
     };
 
     return this.productsService.create(createProductDto, files);
+  }
+
+  @Get()
+  async findAll(@Query() query: any) {
+    return this.productsService.findAll(query);
   }
 
   @Get(':slug')

@@ -13,6 +13,18 @@ const ShopModel = mongoose.model('Shop', ShopSchema);
 const CategoryModel = mongoose.model('Category', CategorySchema);
 const ColorModel = mongoose.model('Color', ColorSchema);
 
+function slugify(text: string) {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[đĐ]/g, 'd')
+    .replace(/([^0-9a-z-\s])/g, '')
+    .replace(/(\s+)/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 async function main() {
   const mongoUri = process.env.MONGODB_URI;
 
@@ -25,7 +37,7 @@ async function main() {
 
   await Promise.all([
     CategoryModel.deleteMany({}),
-    UserModel.deleteMany({}),
+    // UserModel.deleteMany({}),
     RoleModel.deleteMany({}),
     ShopModel.deleteMany({}),
     ColorModel.deleteMany({}),
@@ -76,15 +88,15 @@ async function main() {
     })),
   );
 
-  await UserModel.insertMany(
-    Array.from({ length: 7 }, (_, index) => ({
-      username: `user${index + 1}`,
-      email: `user${index + 1}@daoduck.com`,
-      password: passwordHash,
-      roleId: roleMap.get('USER'),
-      addresses: [],
-    })),
-  );
+  // await UserModel.insertMany(
+  //   Array.from({ length: 7 }, (_, index) => ({
+  //     username: `user${index + 1}`,
+  //     email: `user${index + 1}@daoduck.com`,
+  //     password: passwordHash,
+  //     roleId: roleMap.get('USER'),
+  //     addresses: [],
+  //   })),
+  // );
 
   const categoriesData = [
     { name: 'Áo', parentName: null },
@@ -110,7 +122,10 @@ async function main() {
 
   const categoryMap = new Map<string, mongoose.Types.ObjectId>();
   for (const category of categoriesData.filter((item) => !item.parentName)) {
-    const created = await CategoryModel.create({ name: category.name });
+    const created = await CategoryModel.create({
+      name: category.name,
+      slug: slugify(category.name),
+    });
     categoryMap.set(category.name, created._id);
   }
 
@@ -118,6 +133,7 @@ async function main() {
     const parentId = categoryMap.get(category.parentName as string);
     const created = await CategoryModel.create({
       name: category.name,
+      slug: slugify(category.name),
       parentId,
     });
     categoryMap.set(category.name, created._id);

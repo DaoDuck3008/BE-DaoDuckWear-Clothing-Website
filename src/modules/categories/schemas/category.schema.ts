@@ -9,6 +9,9 @@ export class Category {
   @Prop({ type: String, required: true, trim: true })
   name!: string;
 
+  @Prop({ type: String, required: true, trim: true })
+  slug!: string;
+
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Category', default: null })
   parentId?: Types.ObjectId | null;
 
@@ -19,6 +22,8 @@ export class Category {
 export const CategorySchema = SchemaFactory.createForClass(Category);
 
 CategorySchema.index({ parentId: 1 });
+CategorySchema.index({ slug: 1 });
+
 CategorySchema.pre('findOneAndDelete', async function (this: any) {
   const category = await this.model.findOne(this.getFilter()).lean();
   if (!category) return;
@@ -27,7 +32,7 @@ CategorySchema.pre('findOneAndDelete', async function (this: any) {
     .model('Product')
     .exists({ categoryId: category._id, deletedAt: null });
   if (hasProducts) {
-    throw new Error('KhÃ´ng thá»ƒ xÃ³a danh má»¥c Ä‘ang cÃ³ sáº£n pháº©m');
+    throw new Error('Không thể xóa danh mục đang có sản phẩm');
   }
 
   await this.model.updateMany(
@@ -35,4 +40,5 @@ CategorySchema.pre('findOneAndDelete', async function (this: any) {
     { $set: { parentId: null } },
   );
 });
+
 applyIdVirtual(CategorySchema);

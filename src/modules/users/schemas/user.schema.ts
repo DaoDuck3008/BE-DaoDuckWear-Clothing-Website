@@ -48,27 +48,25 @@ UserSchema.pre('findOneAndDelete', async function (this: any) {
   const user = await this.model.findOne(this.getFilter()).lean();
   if (!user) return;
 
-  const hasOrders = await this.model.db.model('Order').exists({ userId: user._id });
+  const hasOrders = await this.model.db
+    .model('Order')
+    .exists({ userId: user._id });
   if (hasOrders) {
-    throw new Error('KhÃ´ng thá»ƒ xÃ³a user Ä‘Ã£ cÃ³ Ä‘Æ¡n hÃ ng');
+    throw new Error('Không thể xóa user đã có đơn hàng');
   }
 
   await Promise.all([
     this.model.db.model('Cart').deleteOne({ userId: user._id }),
     this.model.db.model('Favorite').deleteMany({ userId: user._id }),
-    this.model.db.model('Review').updateMany(
-      { userId: user._id },
-      { $set: { userId: null } },
-    ),
-    this.model.db.model('Post').updateMany(
-      { authorId: user._id },
-      { $set: { authorId: null } },
-    ),
-    this.model.db.model('AuditLog').updateMany(
-      { userId: user._id },
-      { $set: { userId: null } },
-    ),
+    this.model.db
+      .model('Review')
+      .updateMany({ userId: user._id }, { $set: { userId: null } }),
+    this.model.db
+      .model('Post')
+      .updateMany({ authorId: user._id }, { $set: { authorId: null } }),
+    this.model.db
+      .model('AuditLog')
+      .updateMany({ userId: user._id }, { $set: { userId: null } }),
   ]);
-
 });
 applyIdVirtual(UserSchema);

@@ -39,7 +39,7 @@ export class ProductsService {
         .toLowerCase()
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[Ä‘Ä]/g, 'd')
+        .replace(/[đĐ]/g, 'd')
         .replace(/([^0-9a-z-\s])/g, '')
         .replace(/(\s+)/g, '-')
         .replace(/-+/g, '-')
@@ -152,6 +152,88 @@ export class ProductsService {
     } finally {
       await session.endSession();
     }
+  }
+
+  async findAll(query: {
+    categoryId?: string;
+    colorHexId?: string | string[];
+    size?: string;
+    minPrice?: number;
+    maxPrice?: number;
+    sort?: string;
+    limit?: number;
+    page?: number;
+  }) {
+    const {
+      categoryId,
+      colorHexId,
+      size,
+      minPrice,
+      maxPrice,
+      sort,
+      limit = 12,
+      page = 1,
+    } = query;
+
+    const offset = (page - 1) * limit;
+
+    // 1. Xây dựng filter cho ProductVariant
+    const variantFilter: any = { deletedAt: null };
+    if (colorHexId) {
+      if (Array.isArray(colorHexId)) {
+        variantFilter.colorHexId = {
+          $in: colorHexId.map((id) => this.toObjectId(id)),
+        };
+      } else {
+        variantFilter.colorHexId = this.toObjectId(colorHexId);
+      }
+    }
+    if (size) variantFilter.size = size;
+
+    let productIds: Types.ObjectId[] | null = null;
+    if (colorHexId || size) {
+      const matchingVariants = await this.variantModel.find(
+        variantFilter,
+        'productId',
+      );
+      productIds = matchingVariants.map((v) => v.productId);
+    }
+
+    // 2. Xây dựng filter cho Product
+    const productFilter: any = { deletedAt: null, status: 'active' };
+    if (productIds) productFilter._id = { $in: productIds };
+    if (categoryId) productFilter.categoryId = this.toObjectId(categoryId);
+
+    // Filter theo giá
+    if (minPrice || maxPrice) {
+      productFilter.basePrice = {};
+      if (minPrice) productFilter.basePrice.$gte = Number(minPrice);
+      if (maxPrice) productFilter.basePrice.$lte = Number(maxPrice);
+    }
+
+    // 3. Sắp xếp
+    let sortOptions: any = { createdAt: -1 };
+    if (sort === 'price_asc') sortOptions = { basePrice: 1 };
+    if (sort === 'price_desc') sortOptions = { basePrice: -1 };
+    if (sort === 'newest') sortOptions = { createdAt: -1 };
+
+    const [products, total] = await Promise.all([
+      this.productModel
+        .find(productFilter)
+        .sort(sortOptions)
+        .skip(offset)
+        .limit(limit)
+        .populate('categoryId'),
+      this.productModel.countDocuments(productFilter),
+    ]);
+
+    return {
+      data: products,
+      total,
+      page: Number(page),
+      limit: Number(limit),
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   async findBySlug(slug: string) {

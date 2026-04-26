@@ -29,6 +29,7 @@ export class CategoriesService {
       .map((category) => ({
         id: category.id,
         name: category.name,
+        slug: category.slug,
         children: this.buildTree(categories, category.id),
       }));
   }
