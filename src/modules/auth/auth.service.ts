@@ -116,4 +116,27 @@ export class AuthService {
       refreshToken: newRefreshToken,
     };
   }
+
+  async getProfile(userId: string) {
+    const user = await this.userModel.findById(userId).populate('roleId');
+
+    if (!user) {
+      throw new NotFoundException('Không tìm thấy tài khoản');
+    }
+
+    const role = user.roleId as any;
+    if (!role) {
+      throw new UnauthorizedException('Tài khoản chưa được gán vai trò');
+    }
+
+    return {
+      id: user._id,
+      username: user.username,
+      fullName: user.username,
+      email: user.email,
+      role: role.name,
+      address: user.addresses?.length > 0 ? user.addresses[0].address : '',
+      phone: user.addresses?.length > 0 ? user.addresses[0].phone : '',
+    };
+  }
 }

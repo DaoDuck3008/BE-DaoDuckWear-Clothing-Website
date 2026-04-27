@@ -64,6 +64,10 @@ class OrderItemDto {
 }
 
 export class CreateOrderDto {
+  @IsString()
+  @IsNotEmpty()
+  cartId!: string;
+
   @ValidateNested()
   @Type(() => ShippingAddressDto)
   @IsNotEmpty()
@@ -72,8 +76,8 @@ export class CreateOrderDto {
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => OrderItemDto)
-  @IsNotEmpty()
-  items!: OrderItemDto[];
+  @IsOptional()
+  items?: OrderItemDto[];
 
   @IsEnum(['COD', 'BANK_TRANSFER', 'VNPAY', 'MOMO'])
   @IsNotEmpty()

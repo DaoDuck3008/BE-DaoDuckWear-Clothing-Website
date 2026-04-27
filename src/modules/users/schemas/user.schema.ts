@@ -7,7 +7,7 @@ export type UserDocument = HydratedDocument<User>;
 @Schema({ _id: true })
 export class Address {
   @Prop({ type: String, required: true, trim: true })
-  fullAddress!: string;
+  address!: string;
 
   @Prop({ type: String, trim: true, default: null })
   phone?: string | null;

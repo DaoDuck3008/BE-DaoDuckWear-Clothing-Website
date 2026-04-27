@@ -14,6 +14,7 @@ import { Response, Request } from 'express';
 import { AuthGuard } from '../../common/guards/auth.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 
 @Controller('auth')
 export class AuthController {
@@ -71,6 +72,12 @@ export class AuthController {
   @Roles('USER')
   async getMe(@Req() req: Request) {
     return req.user;
+  }
+
+  @Get('profile')
+  @UseGuards(AuthGuard)
+  async getProfile(@CurrentUser() user: any) {
+    return this.authService.getProfile(user.id);
   }
 
   @Post('logout')

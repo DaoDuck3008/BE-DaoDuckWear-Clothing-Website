@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel, InjectConnection } from '@nestjs/mongoose';
 import { Model, Connection, Types } from 'mongoose';
 import {
@@ -18,6 +22,11 @@ import {
 } from '../products/schemas/inventory.schema';
 import { BusinessException } from 'src/common/exceptions/business.exception';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { generateUniqueHex } from 'src/common/utils/crypto.util';
+import { formatDateCode } from 'src/common/utils/date.util';
+
+import { Cart, CartDocument } from '../cart/schemas/cart.schema';
+import { CartService } from '../cart/cart.service';
 
 @Injectable()
 export class OrdersService {
@@ -29,24 +38,29 @@ export class OrdersService {
     @InjectModel(Inventory.name)
     private inventoryModel: Model<InventoryDocument>,
     @InjectConnection() private readonly connection: Connection,
+    private readonly cartService: CartService,
   ) {}
 
-  async createOrder(createOrderDto: CreateOrderDto, userId?: string) {
+  async createOrder(createOrderDto: CreateOrderDto, userId: string) {
     const session = await this.connection.startSession();
     session.startTransaction();
 
     try {
-      const { items, shippingAddress, paymentMethod } = createOrderDto;
+      const { shippingAddress, paymentMethod } = createOrderDto;
+
+      // 1. Fetch Cart and validate
+      const cart = await this.cartService.getCart(userId);
+
       const snapshotItems: any[] = [];
       let totalAmount = 0;
 
-      // 1. Validate items and build snapshot
-      for (const item of items) {
+      // 2. Validate items from cart and build snapshot
+      for (const cartItem of cart.items) {
         const product = await this.productModel
-          .findById(item.productId)
+          .findById(cartItem.productId)
           .session(session);
         const variant = await this.variantModel
-          .findById(item.variantId)
+          .findById(cartItem.variantId)
           .session(session);
 
         if (
@@ -54,9 +68,8 @@ export class OrdersService {
           !variant ||
           variant.productId.toString() !== product._id.toString()
         ) {
-          throw new BusinessException(
-            `Sản phẩm không hợp lệ`,
-            'BUSINESS_ERROR',
+          throw new NotFoundException(
+            `Sản phẩm ${cartItem.productId} không hợp lệ`,
           );
         }
 
@@ -64,29 +77,32 @@ export class OrdersService {
         const inventory = await this.inventoryModel
           .findOne({
             variantId: variant._id,
-            shopId: new Types.ObjectId(item.shopId),
+            shopId: cartItem.shopId,
           })
           .session(session);
 
-        if (!inventory || inventory.quantity < item.quantity) {
+        if (
+          !inventory ||
+          inventory.quantity - inventory.reservedQuantity < cartItem.quantity
+        ) {
           throw new BusinessException(
             `Sản phẩm ${product.name} - ${variant.size}/${variant.color} tại chi nhánh đã hết hàng`,
             'BUSINESS_ERROR',
           );
         }
 
-        // Deduct stock from the specific shop
-        inventory.quantity -= item.quantity;
+        // Reserve stock
+        inventory.reservedQuantity += cartItem.quantity;
         await inventory.save({ session });
 
         // Build snapshot
         const itemPrice = variant.price || product.basePrice;
-        totalAmount += itemPrice * item.quantity;
+        totalAmount += itemPrice * cartItem.quantity;
 
         snapshotItems.push({
           productId: product._id,
           variantId: variant._id,
-          shopId: new Types.ObjectId(item.shopId),
+          shopId: cartItem.shopId,
           name: product.name,
           image:
             product.images.find((img) => img.isMain)?.url ||
@@ -94,15 +110,15 @@ export class OrdersService {
           size: variant.size,
           color: variant.color,
           price: itemPrice,
-          quantity: item.quantity,
+          quantity: cartItem.quantity,
         });
       }
 
       const shippingFee = 30000;
       const finalTotal = totalAmount + shippingFee;
-      const orderCode = `DDUCK-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      const orderCode = `DDW-${formatDateCode()}-${generateUniqueHex()}`;
 
-      // 2. Create Order
+      // 3. Create Order
       const newOrder = new this.orderModel({
         orderCode,
         userId: userId ? new Types.ObjectId(userId) : null,
@@ -117,6 +133,9 @@ export class OrdersService {
       });
 
       await newOrder.save({ session });
+
+      // 4. Delete Cart after successful order
+      await this.cartService.clearCart(userId);
 
       await session.commitTransaction();
       return newOrder;

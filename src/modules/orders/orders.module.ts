@@ -4,8 +4,17 @@ import { OrdersService } from './orders.service';
 import { OrdersController } from './orders.controller';
 import { Order, OrderSchema } from './schemas/order.schema';
 import { Product, ProductSchema } from '../products/schemas/product.schema';
-import { ProductVariant, ProductVariantSchema } from '../products/schemas/product-variant.schema';
-import { Inventory, InventorySchema } from '../products/schemas/inventory.schema';
+import {
+  ProductVariant,
+  ProductVariantSchema,
+} from '../products/schemas/product-variant.schema';
+import {
+  Inventory,
+  InventorySchema,
+} from '../products/schemas/inventory.schema';
+import { Cart, CartSchema } from '../cart/schemas/cart.schema';
+import { CartService } from '../cart/cart.service';
+import { Shop, ShopSchema } from '../shops/schemas/shop.schema';
 
 @Module({
   imports: [
@@ -14,10 +23,12 @@ import { Inventory, InventorySchema } from '../products/schemas/inventory.schema
       { name: Product.name, schema: ProductSchema },
       { name: ProductVariant.name, schema: ProductVariantSchema },
       { name: Inventory.name, schema: InventorySchema },
+      { name: Cart.name, schema: CartSchema },
+      { name: Shop.name, schema: ShopSchema },
     ]),
   ],
   controllers: [OrdersController],
-  providers: [OrdersService],
+  providers: [OrdersService, CartService],
   exports: [OrdersService],
 })
 export class OrdersModule {}

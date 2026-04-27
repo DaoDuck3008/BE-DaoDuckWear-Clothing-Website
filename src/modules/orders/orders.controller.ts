@@ -16,9 +16,9 @@ export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
   @Post()
+  @UseGuards(AuthGuard)
   async create(@Body() createOrderDto: CreateOrderDto, @Req() req: any) {
-    // If user is logged in, attach userId
-    const userId = req.user?.id;
+    const userId = req.user.id;
     return this.ordersService.createOrder(createOrderDto, userId);
   }
 

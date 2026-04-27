@@ -42,7 +42,16 @@ export class CartService {
       shopId: this.toObjectId(shopId),
     });
 
-    if (!inventory || inventory.stock < quantity) {
+    if (!inventory) {
+      throw new BusinessException(
+        'Sản phẩm không tồn tại ở chi nhánh này',
+        'PRODUCT_NOT_FOUND_IN_SHOP',
+      );
+    }
+
+    const realStock = inventory.stock - inventory.reservedQuantity;
+
+    if (realStock < quantity) {
       throw new BusinessException(
         'Sản phẩm đã hết hàng hoặc không đủ số lượng tại chi nhánh này',
         'OUT_OF_STOCK',
@@ -58,7 +67,7 @@ export class CartService {
 
     if (existingItem) {
       existingItem.quantity += quantity;
-      if (existingItem.quantity > inventory.stock) {
+      if (existingItem.quantity > realStock) {
         throw new BusinessException(
           'Số lượng trong giỏ vượt quá tồn kho hiện có',
           'OUT_OF_STOCK',
@@ -91,7 +100,16 @@ export class CartService {
       shopId: item.shopId,
     });
 
-    if (!inventory || inventory.stock < quantity) {
+    if (!inventory) {
+      throw new BusinessException(
+        'Sản phẩm không tồn tại ở chi nhánh này',
+        'PRODUCT_NOT_FOUND_IN_SHOP',
+      );
+    }
+
+    const realStock = inventory.stock - inventory.reservedQuantity;
+
+    if (realStock < quantity) {
       throw new BusinessException('Số lượng tồn kho không đủ', 'OUT_OF_STOCK');
     }
 
@@ -148,6 +166,7 @@ export class CartService {
         return {
           id: item._id.toString(),
           variantId: variant._id.toString(),
+          productId: variant.productId.toString(),
           quantity: item.quantity,
           shopId: shop?._id?.toString() || item.shopId?.toString(),
           shopName: shop?.name || 'Chi nhánh mặc định',
@@ -176,6 +195,7 @@ export class CartService {
     return {
       items: filteredItems,
       totalPrice,
+      cartId: cart._id.toString(),
     };
   }
 }
