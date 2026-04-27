@@ -9,6 +9,10 @@ export class AddToCartDto {
   @Min(1)
   @Max(100)
   quantity!: number;
+
+  @IsString()
+  @IsNotEmpty()
+  shopId!: string;
 }
 
 export class UpdateCartItemDto {

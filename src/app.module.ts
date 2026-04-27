@@ -13,6 +13,7 @@ import { FavoritesModule } from './modules/favorites/favorites.module';
 import { ColorsModule } from './modules/colors/colors.module';
 import { DatabaseModule } from './database/database.module';
 import { RolesModule } from './modules/roles/roles.module';
+import { OrdersModule } from './modules/orders/orders.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { RolesModule } from './modules/roles/roles.module';
     ShopsModule,
     FavoritesModule,
     ColorsModule,
+    OrdersModule,
     HealthModule,
   ],
   controllers: [],

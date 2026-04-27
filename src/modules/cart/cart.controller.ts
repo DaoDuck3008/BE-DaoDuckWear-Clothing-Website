@@ -45,7 +45,7 @@ export class CartController {
     @CurrentUser('id') userId: string,
     @Param('id') itemId: string,
   ) {
-    return this.cartService.removeItem(userId, itemId);
+    return this.cartService.removeFromCart(userId, itemId);
   }
 
   @Delete('clear')

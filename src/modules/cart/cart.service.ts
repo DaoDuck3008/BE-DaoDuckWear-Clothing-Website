@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { AddToCartDto, UpdateCartItemDto } from './dto/cart.dto';
@@ -10,6 +6,8 @@ import { Cart } from './schemas/cart.schema';
 import { ProductVariant } from '../products/schemas/product-variant.schema';
 import { Product } from '../products/schemas/product.schema';
 import { Inventory } from '../products/schemas/inventory.schema';
+import { BusinessException } from 'src/common/exceptions/business.exception';
+import { Shop } from '../shops/schemas/shop.schema';
 
 @Injectable()
 export class CartService {
@@ -20,188 +18,164 @@ export class CartService {
     @InjectModel(Product.name) private readonly productModel: Model<any>,
     @InjectModel(Inventory.name)
     private readonly inventoryModel: Model<any>,
+    @InjectModel(Shop.name)
+    private readonly shopModel: Model<any>,
   ) {}
 
   async getCart(userId: string) {
-    let cart = await this.cartModel.findOne({
-      userId: this.toObjectId(userId),
-    });
-
-    if (!cart) {
-      cart = await this.cartModel.create({
-        userId: this.toObjectId(userId),
-        items: [],
-      });
-    }
-
+    const cart = await this.ensureCart(userId);
     return this.mapCart(cart);
   }
 
   async addToCart(userId: string, dto: AddToCartDto) {
-    const { variantId, quantity } = dto;
+    const { variantId, quantity, shopId } = dto;
     const cart = await this.ensureCart(userId);
 
-    const variant = await this.variantModel.findById(variantId);
-
-    if (!variant) {
+    const variantDoc = await this.variantModel.findById(variantId);
+    if (!variantDoc) {
       throw new NotFoundException('Không tìm thấy sản phẩm này');
     }
 
-    const availableStock = await this.getAvailableStock(variantId);
-    const existingItem = cart.items.find(
-      (item: any) => item.variantId.toString() === variantId,
-    );
+    // Kiểm tra tồn kho tại chi nhánh đã chọn
+    const inventory = await this.inventoryModel.findOne({
+      variantId: this.toObjectId(variantId),
+      shopId: this.toObjectId(shopId),
+    });
 
-    const newQuantity = existingItem
-      ? existingItem.quantity + quantity
-      : quantity;
-
-    if (newQuantity > availableStock) {
-      throw new BadRequestException(
-        `Không đủ hàng trong kho. Còn lại: ${availableStock}`,
+    if (!inventory || inventory.stock < quantity) {
+      throw new BusinessException(
+        'Sản phẩm đã hết hàng hoặc không đủ số lượng tại chi nhánh này',
+        'OUT_OF_STOCK',
       );
     }
 
-    if (newQuantity > 100) {
-      throw new BadRequestException('Số lượng tối đa trong giỏ hàng là 100');
-    }
+    // Tìm xem đã có sản phẩm này từ cùng 1 shop trong giỏ chưa
+    const existingItem = cart.items.find(
+      (item: any) =>
+        item.variantId?.toString() === variantId &&
+        item.shopId?.toString() === shopId,
+    );
 
     if (existingItem) {
-      existingItem.quantity = newQuantity;
+      existingItem.quantity += quantity;
+      if (existingItem.quantity > inventory.stock) {
+        throw new BusinessException(
+          'Số lượng trong giỏ vượt quá tồn kho hiện có',
+          'OUT_OF_STOCK',
+        );
+      }
     } else {
       cart.items.push({
         variantId: this.toObjectId(variantId),
-        quantity: newQuantity,
-      } as any);
+        shopId: this.toObjectId(shopId),
+        quantity,
+      });
     }
 
     await cart.save();
-    const mappedCart = await this.mapCart(cart);
-    return mappedCart.items.find((item: any) => item.variantId === variantId);
+    return this.getCart(userId);
   }
 
   async updateQuantity(userId: string, itemId: string, dto: UpdateCartItemDto) {
     const { quantity } = dto;
-    const cart = await this.cartModel.findOne({
-      userId: this.toObjectId(userId),
-    });
+    const cart = await this.ensureCart(userId);
 
-    if (!cart) {
-      throw new NotFoundException('Không tìm thấy sản phẩm trong giỏ hàng');
-    }
-
-    const item = cart.items.find((cartItem: any) => cartItem.id === itemId);
-
+    const item = cart.items.id(itemId);
     if (!item) {
       throw new NotFoundException('Không tìm thấy sản phẩm trong giỏ hàng');
     }
 
-    const availableStock = await this.getAvailableStock(
-      item.variantId.toString(),
-    );
-    if (quantity > availableStock) {
-      throw new BadRequestException(
-        `Không đủ hàng trong kho. Còn lại: ${availableStock}`,
-      );
+    // Kiểm tra tồn kho
+    const inventory = await this.inventoryModel.findOne({
+      variantId: item.variantId,
+      shopId: item.shopId,
+    });
+
+    if (!inventory || inventory.stock < quantity) {
+      throw new BusinessException('Số lượng tồn kho không đủ', 'OUT_OF_STOCK');
     }
 
     item.quantity = quantity;
     await cart.save();
-    const mappedCart = await this.mapCart(cart);
-    return mappedCart.items.find((mappedItem: any) => mappedItem.id === itemId);
+    return this.getCart(userId);
   }
 
-  async removeItem(userId: string, itemId: string) {
-    const cart = await this.cartModel.findOne({
-      userId: this.toObjectId(userId),
-    });
-
-    if (!cart) {
-      throw new NotFoundException('Không tìm thấy sản phẩm trong giỏ hàng');
-    }
-
-    const item = cart.items.find((cartItem: any) => cartItem.id === itemId);
-
-    if (!item) {
-      throw new NotFoundException('Không tìm thấy sản phẩm trong giỏ hàng');
-    }
-
-    cart.items = cart.items.filter((cartItem: any) => cartItem.id !== itemId);
+  async removeFromCart(userId: string, itemId: string) {
+    const cart = await this.ensureCart(userId);
+    cart.items = cart.items.filter((i: any) => i._id?.toString() !== itemId);
     await cart.save();
-    return item;
+    return this.getCart(userId);
   }
 
   async clearCart(userId: string) {
-    return this.cartModel.updateOne(
-      { userId: this.toObjectId(userId) },
-      { $set: { items: [] } },
-    );
+    const cart = await this.ensureCart(userId);
+    cart.items = [];
+    await cart.save();
+    return true;
   }
 
   private async ensureCart(userId: string) {
     const objectUserId = this.toObjectId(userId);
-    let cart = await this.cartModel.findOne({ userId: objectUserId });
+    let cart = await this.cartModel
+      .findOne({ userId: objectUserId })
+      .populate('items.variantId items.shopId');
+
     if (!cart) {
       cart = await this.cartModel.create({ userId: objectUserId, items: [] });
+      // Reload to have populated fields
+      return this.cartModel
+        .findById(cart._id)
+        .populate('items.variantId items.shopId');
     }
     return cart;
   }
 
-  private async getAvailableStock(variantId: string) {
-    const inventories = await this.inventoryModel.find({
-      variantId: this.toObjectId(variantId),
-    });
-
-    return inventories.reduce(
-      (total, inventory) =>
-        total + Math.max(inventory.quantity - inventory.reservedQuantity, 0),
-      0,
-    );
+  private toObjectId(id: string) {
+    return new Types.ObjectId(id);
   }
 
   private async mapCart(cart: any) {
     const items = await Promise.all(
       cart.items.map(async (item: any) => {
-        const variant = await this.variantModel.findById(item.variantId);
-        if (!variant) return null;
+        const variant = item.variantId;
+        const shop = item.shopId;
+
+        if (!variant || !variant._id) return null;
 
         const product = await this.productModel.findById(variant.productId);
         if (!product) return null;
 
         return {
-          id: item.id,
-          variantId: variant.id,
+          id: item._id.toString(),
+          variantId: variant._id.toString(),
           quantity: item.quantity,
-          variant: {
-            id: variant.id,
-            price: variant.price,
-            color: variant.color,
-            size: variant.size,
-            productId: product.id,
-            product: {
-              name: product.name,
-              slug: product.slug,
-              images: product.images.map((image: any) => ({
-                url: image.url,
-                color: image.color,
-              })),
-            },
-          },
+          shopId: shop?._id?.toString() || item.shopId?.toString(),
+          shopName: shop?.name || 'Chi nhánh mặc định',
+          name: product.name,
+          price: variant.price,
+          size: variant.size,
+          color: variant.color,
+          slug: product.slug,
+          image:
+            variant.image ||
+            (product.images?.[0]?.url
+              ? product.images[0].url
+              : typeof product.images?.[0] === 'string'
+                ? product.images[0]
+                : ''),
         };
       }),
     );
 
-    return {
-      id: cart.id,
-      userId: cart.userId.toString(),
-      items: items.filter(Boolean),
-    };
-  }
+    const filteredItems = items.filter((i) => i !== null);
+    const totalPrice = filteredItems.reduce(
+      (total, item: any) => total + item.price * item.quantity,
+      0,
+    );
 
-  private toObjectId(id: string) {
-    if (!Types.ObjectId.isValid(id)) {
-      throw new BadRequestException('ID không hợp lệ');
-    }
-    return new Types.ObjectId(id);
+    return {
+      items: filteredItems,
+      totalPrice,
+    };
   }
 }

@@ -15,9 +15,6 @@ export class ProductImage {
   @Prop({ type: Boolean, default: false })
   isThumbnail?: boolean;
 
-  @Prop({ type: String, trim: true, default: null })
-  color?: string | null;
-
   @Prop({ type: Date, default: null })
   deletedAt?: Date | null;
 }

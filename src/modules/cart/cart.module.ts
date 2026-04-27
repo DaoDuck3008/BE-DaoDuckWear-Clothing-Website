@@ -8,7 +8,11 @@ import {
   ProductVariantSchema,
 } from '../products/schemas/product-variant.schema';
 import { Product, ProductSchema } from '../products/schemas/product.schema';
-import { Inventory, InventorySchema } from '../products/schemas/inventory.schema';
+import {
+  Inventory,
+  InventorySchema,
+} from '../products/schemas/inventory.schema';
+import { Shop, ShopSchema } from '../shops/schemas/shop.schema';
 
 @Module({
   imports: [
@@ -17,6 +21,7 @@ import { Inventory, InventorySchema } from '../products/schemas/inventory.schema
       { name: ProductVariant.name, schema: ProductVariantSchema },
       { name: Product.name, schema: ProductSchema },
       { name: Inventory.name, schema: InventorySchema },
+      { name: Shop.name, schema: ShopSchema },
     ]),
   ],
   controllers: [CartController],

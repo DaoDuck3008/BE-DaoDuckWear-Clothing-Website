@@ -117,12 +117,18 @@ export class ProductsService {
             : Number(basePrice);
           const upperColor = variantDto.color.toUpperCase();
 
+          // Tìm ảnh khớp màu cho variant
+          const variantImage = uploadResults.find(
+            (img) => img.color === upperColor,
+          );
+
           const variant = await this.variantModel.create(
             [
               {
                 productId: createdProduct._id,
                 size: variantDto.size,
                 color: upperColor,
+                image: variantImage?.url || null,
                 colorHexId: variantDto.colorHexId
                   ? this.toObjectId(variantDto.colorHexId)
                   : null,
@@ -266,11 +272,16 @@ export class ProductsService {
           .filter((inventory) => inventory.variantId.toString() === variant.id)
           .map((inventory) => {
             const inventoryJson = inventory.toJSON() as Record<string, any>;
-            inventoryJson.shop = inventoryJson.shopId;
-            const shopId = inventory.shopId as any;
-            inventoryJson.shopId = shopId._id?.toString
-              ? shopId._id.toString()
-              : inventory.shopId.toString();
+            const shop = inventory.shopId as any;
+
+            if (shop) {
+              inventoryJson.shop = shop;
+              inventoryJson.shopId = shop.id;
+            } else {
+              inventoryJson.shop = null;
+              inventoryJson.shopId = null;
+            }
+
             return inventoryJson;
           });
         return variantJson;

@@ -37,7 +37,7 @@ async function main() {
 
   await Promise.all([
     CategoryModel.deleteMany({}),
-    // UserModel.deleteMany({}),
+    UserModel.deleteMany({}),
     RoleModel.deleteMany({}),
     ShopModel.deleteMany({}),
     ColorModel.deleteMany({}),
@@ -88,15 +88,15 @@ async function main() {
     })),
   );
 
-  // await UserModel.insertMany(
-  //   Array.from({ length: 7 }, (_, index) => ({
-  //     username: `user${index + 1}`,
-  //     email: `user${index + 1}@daoduck.com`,
-  //     password: passwordHash,
-  //     roleId: roleMap.get('USER'),
-  //     addresses: [],
-  //   })),
-  // );
+  await UserModel.insertMany(
+    Array.from({ length: 7 }, (_, index) => ({
+      username: `user${index + 1}`,
+      email: `user${index + 1}@daoduck.com`,
+      password: passwordHash,
+      roleId: roleMap.get('USER'),
+      addresses: [],
+    })),
+  );
 
   const categoriesData = [
     { name: 'Áo', parentName: null },

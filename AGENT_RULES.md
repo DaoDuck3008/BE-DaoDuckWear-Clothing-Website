@@ -47,3 +47,8 @@ Follow these rules strictly when developing the backend for DaoDuckWear.
 
 - **Project Name**: DaoDuckWear (Clothing Shop).
 - **Main Stack**: NestJS, Mongoose, MongoDB.
+
+## 7. Database Seeding Rules
+
+- **Supplemental Data**: When adding new seed data during development, **create a new separate seed file** (e.g., `src/database/seeders/seed-categories-v2.ts`) and run it. Do **not** run the main `seed.ts` if it contains `deleteMany()` operations that would wipe out current development data.
+- **Master Seed Integrity**: Always update the main `seed.ts` file with the new data patterns. This ensures that the master seed remains the "source of truth" for fresh deployments or when other developers pull the repository.

@@ -15,6 +15,9 @@ export class ProductVariant {
   @Prop({ type: String, trim: true, default: null })
   color?: string | null;
 
+  @Prop({ type: String, default: null })
+  image?: string | null;
+
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Color', default: null })
   colorHexId?: Types.ObjectId | null;
 
@@ -28,7 +31,8 @@ export class ProductVariant {
   deletedAt?: Date | null;
 }
 
-export const ProductVariantSchema = SchemaFactory.createForClass(ProductVariant);
+export const ProductVariantSchema =
+  SchemaFactory.createForClass(ProductVariant);
 
 ProductVariantSchema.index({ sku: 1 }, { unique: true });
 ProductVariantSchema.index({ productId: 1 });
@@ -41,7 +45,7 @@ ProductVariantSchema.pre('findOneAndDelete', async function (this: any) {
     .model('Order')
     .exists({ 'items.variantId': variant._id });
   if (hasOrders) {
-    throw new Error('KhÃ´ng thá»ƒ xÃ³a biáº¿n thá»ƒ Ä‘Ã£ phÃ¡t sinh Ä‘Æ¡n hÃ ng');
+    throw new Error('Không thể xóa biến thể đã phát sinh đơn hàng');
   }
 
   await Promise.all([
@@ -50,6 +54,5 @@ ProductVariantSchema.pre('findOneAndDelete', async function (this: any) {
       .model('Cart')
       .updateMany({}, { $pull: { items: { variantId: variant._id } } }),
   ]);
-
 });
 applyIdVirtual(ProductVariantSchema);
