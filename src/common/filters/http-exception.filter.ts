@@ -84,12 +84,6 @@ export class HttpExceptionFilter implements ExceptionFilter {
       isDev ? (exception as any)?.stack : '',
     );
 
-    // Hiển thị chi tiết lỗi trong môi trường dev
-    if (isDev) {
-      console.error('--- [RESTFUL API EXCEPTION] ---');
-      console.error(exception);
-    }
-
     // 7. Gửi phản hồi JSON về client
     response.status(status).json(responseBody);
   }
