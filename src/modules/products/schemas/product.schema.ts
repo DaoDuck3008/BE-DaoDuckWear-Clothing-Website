@@ -9,6 +9,12 @@ export class ProductImage {
   @Prop({ type: String, required: true })
   url!: string;
 
+  @Prop({ type: String, default: null })
+  publicId?: string | null;
+
+  @Prop({ type: String, default: null, uppercase: true })
+  color?: string | null;
+
   @Prop({ type: Boolean, default: false })
   isMain?: boolean;
 
@@ -61,7 +67,9 @@ ProductSchema.pre('findOneAndDelete', async function (this: any) {
     .model('Order')
     .exists({ 'items.productId': product._id });
   if (hasOrders) {
-    throw new Error('KhÃ´ng thá»ƒ xÃ³a sáº£n pháº©m Ä‘Ã£ phÃ¡t sinh Ä‘Æ¡n hÃ ng');
+    throw new Error(
+      'KhÃ´ng thá»ƒ xÃ³a sáº£n pháº©m Ä‘Ã£ phÃ¡t sinh Ä‘Æ¡n hÃ ng',
+    );
   }
 
   const variants = await this.model.db
@@ -72,7 +80,9 @@ ProductSchema.pre('findOneAndDelete', async function (this: any) {
   const variantIds = variants.map((variant: any) => variant._id);
 
   await Promise.all([
-    this.model.db.model('ProductVariant').deleteMany({ productId: product._id }),
+    this.model.db
+      .model('ProductVariant')
+      .deleteMany({ productId: product._id }),
     this.model.db.model('Inventory').deleteMany({ productId: product._id }),
     this.model.db.model('Favorite').deleteMany({ productId: product._id }),
     this.model.db.model('Review').deleteMany({ productId: product._id }),
@@ -80,7 +90,6 @@ ProductSchema.pre('findOneAndDelete', async function (this: any) {
       .model('Cart')
       .updateMany({}, { $pull: { items: { variantId: { $in: variantIds } } } }),
   ]);
-
 });
 applyIdVirtual(ProductImageSchema);
 applyIdVirtual(ProductSchema);

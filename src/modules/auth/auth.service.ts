@@ -60,7 +60,10 @@ export class AuthService {
   async login(body: LoginDto) {
     const { email, password } = body;
 
-    const user = await this.userModel.findOne({ email }).populate('roleId');
+    const user = await this.userModel
+      .findOne({ email })
+      .populate('shopId', 'name _id')
+      .populate('roleId', 'name _id');
 
     if (!user) {
       throw new NotFoundException('Email hoặc mật khẩu không chính xác');
@@ -83,8 +86,14 @@ export class AuthService {
       throw new UnauthorizedException('Tài khoản chưa được gán vai trò');
     }
 
-    const accessToken = signAccessToken({ id: user.id, role: role.name });
-    const refreshToken = signRefreshToken({ id: user.id, role: role.name });
+    const accessToken = signAccessToken({
+      id: user.id,
+      role: role.name,
+      shopId: user.shopId?.id || null,
+    });
+    const refreshToken = signRefreshToken({
+      id: user.id,
+    });
 
     return {
       user: {
@@ -100,7 +109,8 @@ export class AuthService {
     const decodedToken = verifyRefreshToken(refreshToken);
     const user = await this.userModel
       .findById(decodedToken.id)
-      .populate('roleId');
+      .populate('roleId', 'name _id')
+      .populate('shopId', 'name _id');
 
     if (!user) {
       throw new UnauthorizedException('Không tìm thấy tài khoản');
@@ -111,8 +121,14 @@ export class AuthService {
       throw new UnauthorizedException('Tài khoản chưa được gán vai trò');
     }
 
-    const accessToken = signAccessToken({ id: user.id, role: role.name });
-    const newRefreshToken = signRefreshToken({ id: user.id, role: role.name });
+    const accessToken = signAccessToken({
+      id: user.id,
+      role: role.name,
+      shopId: user.shopId?.id || null,
+    });
+    const newRefreshToken = signRefreshToken({
+      id: user.id,
+    });
 
     return {
       user: {
@@ -142,7 +158,8 @@ export class AuthService {
 
       let user = await this.userModel
         .findOne({ email, provider: 'google' })
-        .populate('roleId');
+        .populate('roleId', 'name _id')
+        .populate('shopId', 'name _id');
 
       // Nếu chưa có tài khoản thì tạo tài khoản mới
       if (!user) {
@@ -172,8 +189,14 @@ export class AuthService {
         throw new UnauthorizedException('Tài khoản chưa được gán vai trò');
       }
 
-      const accessToken = signAccessToken({ id: user.id, role: role.name });
-      const refreshToken = signRefreshToken({ id: user.id, role: role.name });
+      const accessToken = signAccessToken({
+        id: user.id,
+        role: role.name,
+        shopId: user.shopId?.id || null,
+      });
+      const refreshToken = signRefreshToken({
+        id: user.id,
+      });
 
       return {
         user: {

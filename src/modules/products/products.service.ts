@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Connection, Model, Types } from 'mongoose';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
@@ -23,15 +27,8 @@ export class ProductsService {
     createProductDto: CreateProductDto,
     files: Express.Multer.File[],
   ) {
-    const {
-      name,
-      categoryId,
-      shopId,
-      basePrice,
-      description,
-      status,
-      variants,
-    } = createProductDto;
+    const { name, categoryId, basePrice, description, status, variants } =
+      createProductDto;
 
     const slug =
       createProductDto.slug ||
@@ -76,14 +73,20 @@ export class ProductsService {
           if (fieldname === 'common_0') isMain = true;
         }
 
+        // Đặt tên public_id có cấu trúc: slug/loai_mau_timestamp
+        // VD: ao-thun-nam/color_den_1714000000000 | ao-thun-nam/common_1714000000000
+        const typePrefix = color ? `color_${color.toLowerCase()}` : 'common';
+        const publicId = `${slug}/${typePrefix}_${Date.now()}`;
+
         const uploadRes = await this.cloudinary.uploadImage(
           file,
           'products',
-          `${slug}-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          publicId,
         );
 
         uploadResults.push({
           url: uploadRes.secure_url,
+          publicId: uploadRes.public_id,
           color: color?.toUpperCase(),
           isMain,
           isThumbnail: file.fieldname === 'common_0',
@@ -100,7 +103,7 @@ export class ProductsService {
               name,
               slug,
               categoryId: this.toObjectId(categoryId),
-              basePrice,
+              basePrice: Number(basePrice),
               description,
               status: status || 'active',
               images: uploadResults,
@@ -117,36 +120,24 @@ export class ProductsService {
             : Number(basePrice);
           const upperColor = variantDto.color.toUpperCase();
 
-          // Tìm ảnh khớp màu cho variant
-          const variantImage = uploadResults.find(
-            (img) => img.color === upperColor,
-          );
+          // Tìm ảnh khớp màu cho variant (ưu tiên ảnh isMain)
+          const variantImage =
+            uploadResults.find((img) => img.color === upperColor && img.isMain) ||
+            uploadResults.find((img) => img.color === upperColor);
 
-          const variant = await this.variantModel.create(
+          await this.variantModel.create(
             [
               {
                 productId: createdProduct._id,
                 size: variantDto.size,
                 color: upperColor,
                 image: variantImage?.url || null,
+                imagePublicId: variantImage?.publicId || null,
                 colorHexId: variantDto.colorHexId
                   ? this.toObjectId(variantDto.colorHexId)
                   : null,
                 price: variantPrice,
                 sku: variantDto.sku,
-              },
-            ],
-            { session },
-          );
-
-          await this.inventoryModel.create(
-            [
-              {
-                variantId: (variant[0] as any)._id,
-                productId: createdProduct._id,
-                shopId: this.toObjectId(shopId),
-                quantity: Number(variantDto.stock),
-                reservedQuantity: 0,
               },
             ],
             { session },
@@ -242,6 +233,35 @@ export class ProductsService {
     };
   }
 
+  async findAllAdmin(query: {
+    shopId?: string;
+    status?: string;
+    search?: string;
+  }) {
+    const { shopId, status, search } = query;
+    const filter: any = { deletedAt: null };
+
+    if (status) filter.status = status;
+    if (search) {
+      filter.name = { $regex: search, $options: 'i' };
+    }
+
+    // Nếu có shopId, chỉ lấy sản phẩm có tồn kho tại shop đó
+    if (shopId) {
+      const productIds = await this.inventoryModel.distinct('productId', {
+        shopId: this.toObjectId(shopId),
+      });
+      filter._id = { $in: productIds };
+    }
+
+    const products = await this.productModel
+      .find(filter)
+      .sort({ createdAt: -1 })
+      .populate('categoryId');
+
+    return products;
+  }
+
   async findBySlug(slug: string) {
     const product = await this.productModel
       .findOne({ slug, deletedAt: null })
@@ -287,6 +307,165 @@ export class ProductsService {
         return variantJson;
       }),
     };
+  }
+
+  async update(
+    id: string,
+    updateProductDto: any,
+    files: Express.Multer.File[],
+  ) {
+    const product = await this.productModel.findById(id);
+    if (!product) throw new BadRequestException('Sản phẩm không tồn tại');
+
+    const {
+      name,
+      categoryId,
+      basePrice,
+      description,
+      status,
+      variants,
+      deleteImageIds, // Mảng ID ảnh cũ cần xóa
+    } = updateProductDto;
+
+    // Cập nhật slug nếu tên thay đổi
+    let slug = product.slug;
+    if (name && name !== product.name) {
+      slug = name
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[đĐ]/g, 'd')
+        .replace(/([^0-9a-z-\s])/g, '')
+        .replace(/(\s+)/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-+|-+$/g, '');
+    }
+
+    // 1. Xóa tham chiếu ảnh cũ khỏi DB
+    let currentImages = [...product.images];
+    const idsToDelete: string[] = deleteImageIds
+      ? typeof deleteImageIds === 'string'
+        ? JSON.parse(deleteImageIds)
+        : deleteImageIds
+      : [];
+
+    if (idsToDelete.length > 0) {
+      currentImages = currentImages.filter(
+        (img: any) =>
+          !idsToDelete.includes(img.id?.toString() || img._id?.toString()),
+      );
+    }
+
+    // 2. Upload ảnh mới (nếu có files)
+    const newUploadResults: any[] = [];
+    if (files && files.length > 0) {
+      for (const file of files) {
+        const fieldname = Buffer.from(file.fieldname, 'latin1').toString(
+          'utf8',
+        );
+
+        let color: string | null = null;
+        let isMain = false;
+
+        if (fieldname.startsWith('color:')) {
+          const parts = fieldname.split(':');
+          const colorPart = parts[1].split('_')[0];
+          color = colorPart;
+          if (fieldname.endsWith('_0')) isMain = true;
+        } else if (fieldname.startsWith('common_')) {
+          if (fieldname === 'common_0') isMain = true;
+        }
+
+        // Đặt tên public_id có cấu trúc: slug/loai_mau_timestamp
+        const typePrefix = color ? `color_${color.toLowerCase()}` : 'common';
+        const publicId = `${slug}/${typePrefix}_${Date.now()}`;
+
+        const uploadRes = await this.cloudinary.uploadImage(
+          file,
+          'products',
+          publicId,
+        );
+
+        newUploadResults.push({
+          url: uploadRes.secure_url,
+          publicId: uploadRes.public_id,
+          color: color?.toUpperCase() || null,
+          isMain,
+          isThumbnail: fieldname === 'common_0',
+        });
+      }
+    }
+
+    // Ghép ảnh cũ còn lại + ảnh mới
+    const mergedImages = [...currentImages, ...newUploadResults];
+
+    const session = await this.connection.startSession();
+    try {
+      return await session.withTransaction(async () => {
+        // 3. Cập nhật thông tin Product
+        await this.productModel.findByIdAndUpdate(
+          id,
+          {
+            ...(name && { name }),
+            ...(name && { slug }),
+            ...(categoryId && { categoryId: this.toObjectId(categoryId) }),
+            ...(basePrice && { basePrice: Number(basePrice) }),
+            ...(description !== undefined && { description }),
+            ...(status && { status }),
+            images: mergedImages,
+          },
+          { session },
+        );
+
+        // 4. Cập nhật Variants
+        if (variants) {
+          const variantsList =
+            typeof variants === 'string' ? JSON.parse(variants) : variants;
+
+          for (const v of variantsList) {
+            if (v.id) {
+              const upperColor = v.color?.toUpperCase();
+              // Tìm ảnh khớp màu mới nhất từ danh sách đã gộp (ưu tiên ảnh isMain)
+              const variantImage =
+                mergedImages.find(
+                  (img: any) => img.color === upperColor && img.isMain,
+                ) || mergedImages.find((img: any) => img.color === upperColor);
+
+              await this.variantModel.findByIdAndUpdate(
+                v.id,
+                {
+                  ...(v.price && { price: Number(v.price) }),
+                  ...(v.sku && { sku: v.sku }),
+                  ...(v.size && { size: v.size }),
+                  ...(v.color && { color: upperColor }),
+                  image: variantImage?.url || null,
+                  imagePublicId: variantImage?.publicId || null,
+                },
+                { session },
+              );
+            }
+          }
+        }
+
+        return { success: true, slug };
+      });
+    } finally {
+      await session.endSession();
+    }
+  }
+
+  async remove(id: string) {
+    const product = await this.productModel.findById(id);
+    if (!product) throw new BadRequestException('Sản phẩm không tồn tại');
+
+    // SUPER_ADMIN thực hiện xóa mềm toàn hệ thống
+    await this.productModel.findByIdAndUpdate(id, { deletedAt: new Date() });
+    await this.variantModel.updateMany(
+      { productId: id },
+      { deletedAt: new Date() },
+    );
+
+    return { message: 'Đã xóa sản phẩm thành công' };
   }
 
   private toObjectId(id: string) {

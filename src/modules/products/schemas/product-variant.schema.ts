@@ -18,6 +18,9 @@ export class ProductVariant {
   @Prop({ type: String, default: null })
   image?: string | null;
 
+  @Prop({ type: String, default: null })
+  imagePublicId?: string | null;
+
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Color', default: null })
   colorHexId?: Types.ObjectId | null;
 

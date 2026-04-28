@@ -41,6 +41,9 @@ export class User {
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Role', default: null })
   roleId?: Types.ObjectId | null;
 
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Shop', default: null })
+  shopId?: Types.ObjectId | null;
+
   @Prop({ type: [AddressSchema], default: [] })
   addresses!: Address[];
 
