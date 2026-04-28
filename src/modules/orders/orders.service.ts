@@ -46,21 +46,27 @@ export class OrdersService {
     session.startTransaction();
 
     try {
-      const { shippingAddress, paymentMethod } = createOrderDto;
-
-      // 1. Fetch Cart and validate
-      const cart = await this.cartService.getCart(userId);
+      const { shippingAddress, paymentMethod, buyNowItem } = createOrderDto;
 
       const snapshotItems: any[] = [];
       let totalAmount = 0;
 
-      // 2. Validate items from cart and build snapshot
-      for (const cartItem of cart.items) {
+      // 1. Determine items source: buyNowItem OR cart
+      const itemsToProcess = buyNowItem 
+        ? [buyNowItem] 
+        : (await this.cartService.getCart(userId)).items;
+
+      if (!buyNowItem && itemsToProcess.length === 0) {
+        throw new NotFoundException('Giỏ hàng không tồn tại hoặc đã trống');
+      }
+
+      // 2. Validate items and build snapshot
+      for (const currentItem of itemsToProcess) {
         const product = await this.productModel
-          .findById(cartItem.productId)
+          .findById(currentItem.productId)
           .session(session);
         const variant = await this.variantModel
-          .findById(cartItem.variantId)
+          .findById(currentItem.variantId)
           .session(session);
 
         if (
@@ -69,7 +75,7 @@ export class OrdersService {
           variant.productId.toString() !== product._id.toString()
         ) {
           throw new NotFoundException(
-            `Sản phẩm ${cartItem.productId} không hợp lệ`,
+            `Sản phẩm ${currentItem.productId} không hợp lệ`,
           );
         }
 
@@ -77,13 +83,13 @@ export class OrdersService {
         const inventory = await this.inventoryModel
           .findOne({
             variantId: variant._id,
-            shopId: cartItem.shopId,
+            shopId: currentItem.shopId,
           })
           .session(session);
 
         if (
           !inventory ||
-          inventory.quantity - inventory.reservedQuantity < cartItem.quantity
+          inventory.quantity - inventory.reservedQuantity < currentItem.quantity
         ) {
           throw new BusinessException(
             `Sản phẩm ${product.name} - ${variant.size}/${variant.color} tại chi nhánh đã hết hàng`,
@@ -92,17 +98,17 @@ export class OrdersService {
         }
 
         // Reserve stock
-        inventory.reservedQuantity += cartItem.quantity;
+        inventory.reservedQuantity += currentItem.quantity;
         await inventory.save({ session });
 
         // Build snapshot
         const itemPrice = variant.price || product.basePrice;
-        totalAmount += itemPrice * cartItem.quantity;
+        totalAmount += itemPrice * currentItem.quantity;
 
         snapshotItems.push({
           productId: product._id,
           variantId: variant._id,
-          shopId: cartItem.shopId,
+          shopId: currentItem.shopId,
           name: product.name,
           image:
             product.images.find((img) => img.isMain)?.url ||
@@ -110,7 +116,7 @@ export class OrdersService {
           size: variant.size,
           color: variant.color,
           price: itemPrice,
-          quantity: cartItem.quantity,
+          quantity: currentItem.quantity,
         });
       }
 
@@ -134,8 +140,10 @@ export class OrdersService {
 
       await newOrder.save({ session });
 
-      // 4. Delete Cart after successful order
-      await this.cartService.clearCart(userId);
+      // 4. Delete Cart after successful order IF NOT BUY NOW
+      if (!buyNowItem) {
+        await this.cartService.clearCart(userId);
+      }
 
       await session.commitTransaction();
       return newOrder;

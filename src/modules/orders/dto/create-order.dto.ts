@@ -63,10 +63,28 @@ class OrderItemDto {
   quantity!: number;
 }
 
-export class CreateOrderDto {
+class BuyNowItemDto {
   @IsString()
   @IsNotEmpty()
-  cartId!: string;
+  productId!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  variantId!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  shopId!: string;
+
+  @IsNumber()
+  @Min(1)
+  quantity!: number;
+}
+
+export class CreateOrderDto {
+  @IsString()
+  @IsOptional()
+  cartId?: string;
 
   @ValidateNested()
   @Type(() => ShippingAddressDto)
@@ -78,6 +96,11 @@ export class CreateOrderDto {
   @Type(() => OrderItemDto)
   @IsOptional()
   items?: OrderItemDto[];
+
+  @ValidateNested()
+  @Type(() => BuyNowItemDto)
+  @IsOptional()
+  buyNowItem?: BuyNowItemDto;
 
   @IsEnum(['COD', 'BANK_TRANSFER', 'VNPAY', 'MOMO'])
   @IsNotEmpty()
