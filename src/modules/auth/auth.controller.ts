@@ -62,6 +62,40 @@ export class AuthController {
         id: user.id,
         email: user.email,
         username: user.username,
+        avatar: user.avatar || '',
+        role: user.role!.name,
+      },
+    };
+  }
+
+  @Post('google')
+  async googleLogin(
+    @Body('credential') credential: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    if (!credential) {
+      throw new UnauthorizedException('Thiếu Google credential');
+    }
+
+    const { user, accessToken, refreshToken } =
+      await this.authService.googleLogin(credential);
+
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days for google login
+    });
+
+    return {
+      success: true,
+      message: 'Đăng nhập với Google thành công!',
+      accessToken: accessToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        avatar: user.avatar || '',
         role: user.role!.name,
       },
     };
@@ -126,6 +160,7 @@ export class AuthController {
         id: user.id,
         email: user.email,
         username: user.username,
+        avatar: user.avatar || '',
         role: user.role!.name,
       },
     };

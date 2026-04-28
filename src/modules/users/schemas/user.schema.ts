@@ -26,8 +26,17 @@ export class User {
   @Prop({ type: String, required: true, lowercase: true, trim: true })
   email!: string;
 
-  @Prop({ type: String, required: true })
-  password!: string;
+  @Prop({ type: String, default: null })
+  password?: string | null;
+
+  @Prop({ type: String, default: 'local', index: true })
+  provider!: 'local' | 'google' | 'facebook';
+
+  @Prop({ type: String, default: null })
+  providerId?: string | null;
+
+  @Prop({ type: String, default: null })
+  avatar?: string | null;
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Role', default: null })
   roleId?: Types.ObjectId | null;

@@ -17,6 +17,7 @@ import {
 } from '../../common/utils/jwt.util';
 import { User } from '../users/schemas/user.schema';
 import { Role } from '../roles/schemas/role.schema';
+import { OAuth2Client } from 'google-auth-library';
 
 @Injectable()
 export class AuthService {
@@ -65,7 +66,13 @@ export class AuthService {
       throw new NotFoundException('Email hoặc mật khẩu không chính xác');
     }
 
-    const isPasswordValid = await comparePassword(password, user.password);
+    if (!user.password || user.provider === 'google') {
+      throw new UnauthorizedException(
+        'Tài khoản của bạn được đăng nhập bởi Google. Hãy sử dụng Google để đăng nhập',
+      );
+    }
+
+    const isPasswordValid = await comparePassword(password, user.password!);
 
     if (!isPasswordValid) {
       throw new UnauthorizedException('Email hoặc mật khẩu không chính xác');
@@ -115,6 +122,71 @@ export class AuthService {
       accessToken,
       refreshToken: newRefreshToken,
     };
+  }
+
+  async googleLogin(credential: string) {
+    const client = new OAuth2Client(process.env.GOOGLE_OAUTH_CLIENT_ID);
+
+    try {
+      const ticket = await client.verifyIdToken({
+        idToken: credential,
+        audience: process.env.GOOGLE_OAUTH_CLIENT_ID,
+      });
+      const payload = ticket.getPayload();
+
+      if (!payload) {
+        throw new UnauthorizedException('Google token không hợp lệ');
+      }
+
+      const { email, name, picture } = payload;
+
+      let user = await this.userModel
+        .findOne({ email, provider: 'google' })
+        .populate('roleId');
+
+      // Nếu chưa có tài khoản thì tạo tài khoản mới
+      if (!user) {
+        const role = await this.roleModel.findOne({ name: 'USER' });
+        if (!role) {
+          throw new NotFoundException('Không tìm thấy vai trò USER');
+        }
+
+        const randomPassword = Math.random().toString(36).slice(-10);
+        const hashedPassword = await hashPassword(randomPassword);
+
+        const newUser = await this.userModel.create({
+          email,
+          username: name || email!.split('@')[0],
+          password: hashedPassword,
+          roleId: role._id,
+          provider: 'google',
+          providerId: payload.sub,
+          avatar: picture,
+        });
+
+        user = await this.userModel.findById(newUser._id).populate('roleId');
+      }
+
+      const role = user.roleId as any;
+      if (!role) {
+        throw new UnauthorizedException('Tài khoản chưa được gán vai trò');
+      }
+
+      const accessToken = signAccessToken({ id: user.id, role: role.name });
+      const refreshToken = signRefreshToken({ id: user.id, role: role.name });
+
+      return {
+        user: {
+          ...user.toJSON(),
+          role: role.toJSON(),
+        },
+        accessToken,
+        refreshToken,
+      };
+    } catch (error) {
+      console.error('Google Auth Error:', error);
+      throw new UnauthorizedException('Xác thực Google thất bại');
+    }
   }
 
   async getProfile(userId: string) {
