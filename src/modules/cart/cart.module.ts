@@ -11,7 +11,7 @@ import { Product, ProductSchema } from '../products/schemas/product.schema';
 import {
   Inventory,
   InventorySchema,
-} from '../products/schemas/inventory.schema';
+} from '../inventory/schemas/inventory.schema';
 import { Shop, ShopSchema } from '../shops/schemas/shop.schema';
 
 @Module({

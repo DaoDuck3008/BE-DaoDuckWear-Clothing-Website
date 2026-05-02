@@ -19,7 +19,7 @@ import {
 import {
   Inventory,
   InventoryDocument,
-} from '../products/schemas/inventory.schema';
+} from '../inventory/schemas/inventory.schema';
 import { BusinessException } from 'src/common/exceptions/business.exception';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { generateUniqueHex } from 'src/common/utils/crypto.util';
@@ -52,8 +52,8 @@ export class OrdersService {
       let totalAmount = 0;
 
       // 1. Determine items source: buyNowItem OR cart
-      const itemsToProcess = buyNowItem 
-        ? [buyNowItem] 
+      const itemsToProcess = buyNowItem
+        ? [buyNowItem]
         : (await this.cartService.getCart(userId)).items;
 
       if (!buyNowItem && itemsToProcess.length === 0) {

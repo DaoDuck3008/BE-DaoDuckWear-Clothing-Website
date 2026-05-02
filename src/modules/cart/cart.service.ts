@@ -5,7 +5,7 @@ import { AddToCartDto, UpdateCartItemDto } from './dto/cart.dto';
 import { Cart } from './schemas/cart.schema';
 import { ProductVariant } from '../products/schemas/product-variant.schema';
 import { Product } from '../products/schemas/product.schema';
-import { Inventory } from '../products/schemas/inventory.schema';
+import { Inventory } from '../inventory/schemas/inventory.schema';
 import { BusinessException } from 'src/common/exceptions/business.exception';
 import { Shop } from '../shops/schemas/shop.schema';
 

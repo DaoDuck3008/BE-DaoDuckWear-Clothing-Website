@@ -10,18 +10,16 @@ import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { Product, ProductImage } from './schemas/product.schema';
 import { ProductVariant } from './schemas/product-variant.schema';
-import { Inventory } from './schemas/inventory.schema';
 import { SlugGenerator } from '../../common/utils/slug.util';
+import { Inventory } from '../inventory/schemas/inventory.schema';
 
 @Injectable()
 export class ProductsService {
   constructor(
     @InjectConnection() private readonly connection: Connection,
     @InjectModel(Product.name) private readonly productModel: Model<any>,
-    @InjectModel(ProductVariant.name)
-    private readonly variantModel: Model<any>,
-    @InjectModel(Inventory.name)
-    private readonly inventoryModel: Model<any>,
+    @InjectModel(ProductVariant.name) private readonly variantModel: Model<any>,
+    @InjectModel(Inventory.name) private readonly inventoryModel: Model<any>,
     private readonly cloudinary: CloudinaryService,
   ) {}
 

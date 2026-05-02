@@ -7,16 +7,19 @@ import {
   ProductVariant,
   ProductVariantSchema,
 } from './schemas/product-variant.schema';
-import { Inventory, InventorySchema } from './schemas/inventory.schema';
 import { Shop, ShopSchema } from '../shops/schemas/shop.schema';
+import {
+  Inventory,
+  InventorySchema,
+} from '../inventory/schemas/inventory.schema';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: Product.name, schema: ProductSchema },
       { name: ProductVariant.name, schema: ProductVariantSchema },
-      { name: Inventory.name, schema: InventorySchema },
       { name: Shop.name, schema: ShopSchema },
+      { name: Inventory.name, schema: InventorySchema },
     ]),
   ],
   controllers: [ProductsController],

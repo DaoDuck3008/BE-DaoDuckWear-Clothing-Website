@@ -14,6 +14,7 @@ import { ColorsModule } from './modules/colors/colors.module';
 import { DatabaseModule } from './database/database.module';
 import { RolesModule } from './modules/roles/roles.module';
 import { OrdersModule } from './modules/orders/orders.module';
+import { InventoryModule } from './modules/inventory/inventory.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { OrdersModule } from './modules/orders/orders.module';
     CloudinaryModule,
     CategoriesModule,
     ProductsModule,
+    InventoryModule,
     CartModule,
     ShopsModule,
     FavoritesModule,

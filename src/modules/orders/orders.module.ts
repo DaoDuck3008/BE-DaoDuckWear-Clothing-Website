@@ -11,7 +11,7 @@ import {
 import {
   Inventory,
   InventorySchema,
-} from '../products/schemas/inventory.schema';
+} from '../inventory/schemas/inventory.schema';
 import { Cart, CartSchema } from '../cart/schemas/cart.schema';
 import { CartService } from '../cart/cart.service';
 import { Shop, ShopSchema } from '../shops/schemas/shop.schema';
