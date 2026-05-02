@@ -64,7 +64,7 @@ export class AuthController {
         username: user.username,
         avatar: user.avatar || '',
         role: user.role!.name,
-        shopId: user.shopId?.id || null,
+        shop: user.shopId || null,
       },
     };
   }
@@ -98,7 +98,7 @@ export class AuthController {
         username: user.username,
         avatar: user.avatar || '',
         role: user.role!.name,
-        shopId: user.shopId?.id || null,
+        shop: user.shopId || null,
       },
     };
   }
@@ -164,7 +164,7 @@ export class AuthController {
         username: user.username,
         avatar: user.avatar || '',
         role: user.role!.name,
-        shopId: user.shopId?.id || null,
+        shop: user.shopId || null,
       },
     };
   }

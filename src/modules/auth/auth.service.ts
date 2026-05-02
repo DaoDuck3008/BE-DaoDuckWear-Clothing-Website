@@ -181,7 +181,10 @@ export class AuthService {
           avatar: picture,
         });
 
-        user = await this.userModel.findById(newUser._id).populate('roleId');
+        user = await this.userModel
+          .findById(newUser._id)
+          .populate('roleId', 'name _id')
+          .populate('shopId', 'name _id');
       }
 
       const role = user.roleId as any;
