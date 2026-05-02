@@ -25,13 +25,14 @@ export class ProductsController {
 
   @Post()
   @UseGuards(AuthGuard, RolesGuard)
-  @Roles('ADMIN')
+  @Roles('ADMIN') // Chỉ ADMIN toàn hệ thống mới có quyền tạo sản phẩm
   @UseInterceptors(AnyFilesInterceptor())
   async create(
     @Body() body: any,
-    @UploadedFiles() files: Express.Multer.File[],
+    @UploadedFiles() files: Express.Multer.File[], // Lấy ảnh từ form-data
   ) {
     const createProductDto: CreateProductDto = {
+      // Ép kiểu dữ liệu từ JSON String về đúng kiểu dữ liệu thông qua DTO
       ...body,
       variants:
         typeof body.variants === 'string'
@@ -46,12 +47,8 @@ export class ProductsController {
   @Get('admin')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles('ADMIN', 'SHOP_ADMIN')
-  async findAllAdmin(
-    @CurrentShopId() shopId: string,
-    @Query('status') status?: string,
-    @Query('search') search?: string,
-  ) {
-    return this.productsService.findAllAdmin({ shopId, status, search });
+  async findAllAdmin(@CurrentShopId() shopId: string, @Query() query: any) {
+    return this.productsService.findAllAdmin({ shopId, ...query });
   }
 
   @Get()
@@ -66,7 +63,7 @@ export class ProductsController {
 
   @Patch(':id')
   @UseGuards(AuthGuard, RolesGuard)
-  @Roles('ADMIN')
+  @Roles('ADMIN') // Chỉ ADMIN toàn hệ thống mới có quyền cập nhật sản phẩm
   @UseInterceptors(AnyFilesInterceptor())
   async update(
     @Param('id') id: string,
@@ -79,7 +76,7 @@ export class ProductsController {
 
   @Delete(':id')
   @UseGuards(AuthGuard, RolesGuard)
-  @Roles('ADMIN')
+  @Roles('ADMIN') // Chỉ ADMIN toàn hệ thống mới có quyền xóa sản phẩm
   async remove(@Param('id') id: string) {
     return this.productsService.remove(id);
   }

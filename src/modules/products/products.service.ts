@@ -2,14 +2,16 @@ import {
   Injectable,
   BadRequestException,
   UnauthorizedException,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Connection, Model, Types } from 'mongoose';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { CreateProductDto } from './dto/create-product.dto';
-import { Product } from './schemas/product.schema';
+import { Product, ProductImage } from './schemas/product.schema';
 import { ProductVariant } from './schemas/product-variant.schema';
 import { Inventory } from './schemas/inventory.schema';
+import { SlugGenerator } from '../../common/utils/slug.util';
 
 @Injectable()
 export class ProductsService {
@@ -30,19 +32,9 @@ export class ProductsService {
     const { name, categoryId, basePrice, description, status, variants } =
       createProductDto;
 
-    const slug =
-      createProductDto.slug ||
-      name
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[đĐ]/g, 'd')
-        .replace(/([^0-9a-z-\s])/g, '')
-        .replace(/(\s+)/g, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-+|-+$/g, '');
+    const slug = createProductDto.slug ?? SlugGenerator(name); // Generate SLUG từ tên sản phẩm
 
-    const existingProduct = await this.productModel.exists({ slug });
+    const existingProduct = await this.productModel.exists({ slug }); // Check xem có slug đã tồn tại chưa
     if (existingProduct) {
       throw new BadRequestException('Sản phẩm đã tồn tại');
     }
@@ -54,45 +46,10 @@ export class ProductsService {
       throw new BadRequestException('SKU đã tồn tại trong hệ thống');
     }
 
-    const uploadResults: any[] = [];
-    if (files && files.length > 0) {
-      for (const file of files) {
-        const fieldname = Buffer.from(file.fieldname, 'latin1').toString(
-          'utf8',
-        );
-
-        let color: string | null = null;
-        let isMain = false;
-
-        if (fieldname.startsWith('color:')) {
-          const parts = fieldname.split(':');
-          const colorPart = parts[1].split('_')[0];
-          color = colorPart;
-          if (fieldname.endsWith('_0')) isMain = true;
-        } else if (fieldname.startsWith('common_')) {
-          if (fieldname === 'common_0') isMain = true;
-        }
-
-        // Đặt tên public_id có cấu trúc: slug/loai_mau_timestamp
-        // VD: ao-thun-nam/color_den_1714000000000 | ao-thun-nam/common_1714000000000
-        const typePrefix = color ? `color_${color.toLowerCase()}` : 'common';
-        const publicId = `${slug}/${typePrefix}_${Date.now()}`;
-
-        const uploadRes = await this.cloudinary.uploadImage(
-          file,
-          'products',
-          publicId,
-        );
-
-        uploadResults.push({
-          url: uploadRes.secure_url,
-          publicId: uploadRes.public_id,
-          color: color?.toUpperCase(),
-          isMain,
-          isThumbnail: file.fieldname === 'common_0',
-        });
-      }
-    }
+    const uploadResults = await this.cloudinary.uploadProductImages(
+      files,
+      slug,
+    ); // Upload ảnh lên Cloudinary
 
     const session = await this.connection.startSession();
     try {
@@ -117,13 +74,14 @@ export class ProductsService {
         for (const variantDto of variants) {
           const variantPrice = variantDto.price
             ? Number(variantDto.price)
-            : Number(basePrice);
-          const upperColor = variantDto.color.toUpperCase();
+            : Number(basePrice); // Nếu không có giá variant => dùng giá basePrice
+          const upperColor = variantDto.color.toUpperCase(); // Viết hoa màu
 
           // Tìm ảnh khớp màu cho variant (ưu tiên ảnh isMain)
           const variantImage =
-            uploadResults.find((img) => img.color === upperColor && img.isMain) ||
-            uploadResults.find((img) => img.color === upperColor);
+            uploadResults.find(
+              (img) => img.color === upperColor && img.isMain,
+            ) || uploadResults.find((img) => img.color === upperColor);
 
           await this.variantModel.create(
             [
@@ -131,8 +89,8 @@ export class ProductsService {
                 productId: createdProduct._id,
                 size: variantDto.size,
                 color: upperColor,
-                image: variantImage?.url || null,
-                imagePublicId: variantImage?.publicId || null,
+                image: variantImage?.url || null, // Ảnh của variant
+                imagePublicId: variantImage?.publicId || null, // PublicId ảnh của variant
                 colorHexId: variantDto.colorHexId
                   ? this.toObjectId(variantDto.colorHexId)
                   : null,
@@ -243,7 +201,7 @@ export class ProductsService {
 
     if (status) filter.status = status;
     if (search) {
-      filter.name = { $regex: search, $options: 'i' };
+      filter.name = { $regex: search, $options: 'i' }; // i: case insensitive
     }
 
     // Nếu có shopId, chỉ lấy sản phẩm có tồn kho tại shop đó
@@ -287,6 +245,7 @@ export class ProductsService {
       ...productJson,
       category,
       variants: variants.map((variant) => {
+        // Time complexity O(n*m)
         const variantJson = variant.toJSON() as Record<string, any>;
         variantJson.inventories = inventories
           .filter((inventory) => inventory.variantId.toString() === variant.id)
@@ -312,10 +271,10 @@ export class ProductsService {
   async update(
     id: string,
     updateProductDto: any,
-    files: Express.Multer.File[],
+    files: Express.Multer.File[], // File ảnh mới
   ) {
     const product = await this.productModel.findById(id);
-    if (!product) throw new BadRequestException('Sản phẩm không tồn tại');
+    if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
 
     const {
       name,
@@ -330,15 +289,7 @@ export class ProductsService {
     // Cập nhật slug nếu tên thay đổi
     let slug = product.slug;
     if (name && name !== product.name) {
-      slug = name
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[đĐ]/g, 'd')
-        .replace(/([^0-9a-z-\s])/g, '')
-        .replace(/(\s+)/g, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-+|-+$/g, '');
+      slug = SlugGenerator(name);
     }
 
     // 1. Xóa tham chiếu ảnh cũ khỏi DB
@@ -353,47 +304,16 @@ export class ProductsService {
       currentImages = currentImages.filter(
         (img: any) =>
           !idsToDelete.includes(img.id?.toString() || img._id?.toString()),
-      );
+      ); // kiểm tra và lọc ra các ảnh cũ cần xóa theo id
     }
 
     // 2. Upload ảnh mới (nếu có files)
-    const newUploadResults: any[] = [];
+    let newUploadResults: ProductImage[] = [];
     if (files && files.length > 0) {
-      for (const file of files) {
-        const fieldname = Buffer.from(file.fieldname, 'latin1').toString(
-          'utf8',
-        );
-
-        let color: string | null = null;
-        let isMain = false;
-
-        if (fieldname.startsWith('color:')) {
-          const parts = fieldname.split(':');
-          const colorPart = parts[1].split('_')[0];
-          color = colorPart;
-          if (fieldname.endsWith('_0')) isMain = true;
-        } else if (fieldname.startsWith('common_')) {
-          if (fieldname === 'common_0') isMain = true;
-        }
-
-        // Đặt tên public_id có cấu trúc: slug/loai_mau_timestamp
-        const typePrefix = color ? `color_${color.toLowerCase()}` : 'common';
-        const publicId = `${slug}/${typePrefix}_${Date.now()}`;
-
-        const uploadRes = await this.cloudinary.uploadImage(
-          file,
-          'products',
-          publicId,
-        );
-
-        newUploadResults.push({
-          url: uploadRes.secure_url,
-          publicId: uploadRes.public_id,
-          color: color?.toUpperCase() || null,
-          isMain,
-          isThumbnail: fieldname === 'common_0',
-        });
-      }
+      newUploadResults = await this.cloudinary.uploadProductImages(
+        files as Express.Multer.File[],
+        slug,
+      );
     }
 
     // Ghép ảnh cũ còn lại + ảnh mới
@@ -417,20 +337,44 @@ export class ProductsService {
           { session },
         );
 
-        // 4. Cập nhật Variants
+        // 4. Cập nhật Variants (Đồng bộ: Thêm/Sửa/Xóa mềm)
         if (variants) {
           const variantsList =
             typeof variants === 'string' ? JSON.parse(variants) : variants;
 
-          for (const v of variantsList) {
-            if (v.id) {
-              const upperColor = v.color?.toUpperCase();
-              // Tìm ảnh khớp màu mới nhất từ danh sách đã gộp (ưu tiên ảnh isMain)
-              const variantImage =
-                mergedImages.find(
-                  (img: any) => img.color === upperColor && img.isMain,
-                ) || mergedImages.find((img: any) => img.color === upperColor);
+          // Lấy danh sách ID variant hiện tại trong DB (chưa xóa)
+          const currentVariants = await this.variantModel
+            .find({ productId: id, deletedAt: null })
+            .session(session);
 
+          const currentIds = currentVariants.map((v) => v._id.toString());
+          const incomingIds = variantsList
+            .filter((v: any) => v.id)
+            .map((v: any) => v.id);
+
+          // Bước A: Tìm các ID cần XÓA MỀM (Có trong DB nhưng không có trong list gửi lên)
+          const idsToDelete = currentIds.filter(
+            (cid) => !incomingIds.includes(cid),
+          );
+          if (idsToDelete.length > 0) {
+            await this.variantModel.updateMany(
+              { _id: { $in: idsToDelete } },
+              { deletedAt: new Date() },
+              { session },
+            );
+          }
+
+          // Bước B: Lặp qua list gửi lên để CẬP NHẬT hoặc THÊM MỚI
+          for (const v of variantsList) {
+            const upperColor = v.color?.toUpperCase();
+            // Tìm ảnh khớp màu mới nhất từ danh sách đã gộp (ưu tiên ảnh isMain)
+            const variantImage =
+              mergedImages.find(
+                (img: any) => img.color === upperColor && img.isMain,
+              ) || mergedImages.find((img: any) => img.color === upperColor);
+
+            if (v.id) {
+              // Trường hợp 1: CẬP NHẬT
               await this.variantModel.findByIdAndUpdate(
                 v.id,
                 {
@@ -441,6 +385,23 @@ export class ProductsService {
                   image: variantImage?.url || null,
                   imagePublicId: variantImage?.publicId || null,
                 },
+                { session },
+              );
+            } else {
+              // Trường hợp 2: THÊM MỚI (Không có id)
+              await this.variantModel.create(
+                [
+                  {
+                    productId: id,
+                    sku: v.sku || `SKU-${Date.now()}-${Math.random()}`,
+                    size: v.size,
+                    color: upperColor,
+                    price: Number(v.price || basePrice),
+                    image: variantImage?.url || null,
+                    imagePublicId: variantImage?.publicId || null,
+                    status: 'active',
+                  },
+                ],
                 { session },
               );
             }
@@ -459,10 +420,10 @@ export class ProductsService {
     if (!product) throw new BadRequestException('Sản phẩm không tồn tại');
 
     // SUPER_ADMIN thực hiện xóa mềm toàn hệ thống
-    await this.productModel.findByIdAndUpdate(id, { deletedAt: new Date() });
+    await this.productModel.findByIdAndUpdate(id, { deletedAt: new Date() }); // SOFT DELETE cho product
     await this.variantModel.updateMany(
       { productId: id },
-      { deletedAt: new Date() },
+      { deletedAt: new Date() }, // SOFT DELETE cho variant
     );
 
     return { message: 'Đã xóa sản phẩm thành công' };
