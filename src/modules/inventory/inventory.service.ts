@@ -20,8 +20,8 @@ export class InventoryService {
     private readonly variantModel: Model<any>,
   ) {}
 
-  async findAllInventoryAdmin(query: {
-    shopId: string;
+   async findAllInventoryAdmin(query: {
+    shopId?: string;
     search?: string;
     categoryId?: string;
     page?: number;
@@ -88,16 +88,18 @@ export class InventoryService {
 
     const finalProductIds = products.map((p) => p._id);
 
+    const inventoryFilter: any = { productId: { $in: finalProductIds } };
+    if (shopId) {
+      inventoryFilter.shopId = this.toObjectId(shopId);
+    }
+
     // Lấy variants và tồn kho cùng lúc
     const [variants, inventories] = await Promise.all([
       this.variantModel.find({
         productId: { $in: finalProductIds },
         deletedAt: null,
       }),
-      this.inventoryModel.find({
-        productId: { $in: finalProductIds },
-        shopId: this.toObjectId(shopId),
-      }),
+      this.inventoryModel.find(inventoryFilter),
     ]);
 
     const data = products.map((product) => {
@@ -109,13 +111,20 @@ export class InventoryService {
       return {
         ...productJson,
         variants: productVariants.map((variant) => {
-          const inventory = inventories.find(
+          const variantInventories = inventories.filter(
             (inv) => inv.variantId.toString() === variant.id,
           );
+
           return {
             ...variant.toJSON(),
-            quantity: inventory ? inventory.quantity : 0,
-            reservedQuantity: inventory ? inventory.reservedQuantity : 0,
+            quantity: variantInventories.reduce(
+              (sum, inv) => sum + (inv.quantity || 0),
+              0,
+            ),
+            reservedQuantity: variantInventories.reduce(
+              (sum, inv) => sum + (inv.reservedQuantity || 0),
+              0,
+            ),
           };
         }),
       };
@@ -162,30 +171,38 @@ export class InventoryService {
     return { success: true };
   }
 
-  async findOneProductInventory(shopId: string, slug: string) {
+  async findOneProductInventory(slug: string, shopId?: string) {
     const product = await this.productModel
       .findOne({ slug, deletedAt: null })
       .populate('categoryId');
     if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
 
+    const inventoryFilter: any = { productId: product._id };
+    if (shopId) {
+      inventoryFilter.shopId = this.toObjectId(shopId);
+    }
+
     const [variants, inventories] = await Promise.all([
       this.variantModel.find({ productId: product._id, deletedAt: null }),
-      this.inventoryModel.find({
-        productId: product._id,
-        shopId: this.toObjectId(shopId),
-      }),
+      this.inventoryModel.find(inventoryFilter),
     ]);
 
     return {
       ...product.toJSON(),
       variants: variants.map((variant) => {
-        const inventory = inventories.find(
+        const variantInventories = inventories.filter(
           (inv) => inv.variantId.toString() === variant.id,
         );
         return {
           ...variant.toJSON(),
-          quantity: inventory ? inventory.quantity : 0,
-          reservedQuantity: inventory ? inventory.reservedQuantity : 0,
+          quantity: variantInventories.reduce(
+            (sum, inv) => sum + (inv.quantity || 0),
+            0,
+          ),
+          reservedQuantity: variantInventories.reduce(
+            (sum, inv) => sum + (inv.reservedQuantity || 0),
+            0,
+          ),
         };
       }),
     };

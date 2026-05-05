@@ -13,6 +13,7 @@ import { AuthGuard } from '../../common/guards/auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentShopId } from '../../common/decorators/current-shop.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @Controller('inventory')
 @UseGuards(AuthGuard, RolesGuard)
@@ -21,30 +22,45 @@ export class InventoryController {
 
   @Get()
   @Roles('ADMIN', 'MANAGER', 'STAFF')
-  async findAll(@CurrentShopId() shopId: string, @Query() query: any) {
-    if (!shopId) {
-      throw new BadRequestException('Tài khoản của bạn không thuộc chi nhánh nào');
+  async findAll(
+    @CurrentUser() user: any,
+    @CurrentShopId() currentShopId: string,
+    @Query() query: any,
+  ) {
+    const shopId = user.role === 'ADMIN' ? query.shopId : currentShopId;
+    // Nếu không phải admin thì phải có shopId
+    if (user.role !== 'ADMIN' && !shopId) {
+      throw new BadRequestException('Vui lòng chọn chi nhánh');
     }
-    return this.inventoryService.findAllInventoryAdmin({ shopId, ...query });
+    return this.inventoryService.findAllInventoryAdmin({ ...query, shopId });
   }
 
   @Get(':slug')
   @Roles('ADMIN', 'MANAGER', 'STAFF')
   async findOne(
-    @CurrentShopId() shopId: string,
+    @CurrentUser() user: any,
+    @CurrentShopId() currentShopId: string,
     @Param('slug') slug: string,
+    @Query('shopId') queryShopId: string,
   ) {
-    if (!shopId) {
-      throw new BadRequestException('Tài khoản của bạn không thuộc chi nhánh nào');
+    const shopId = user.role === 'ADMIN' ? queryShopId : currentShopId;
+    if (user.role !== 'ADMIN' && !shopId) {
+      throw new BadRequestException('Vui lòng chọn chi nhánh');
     }
-    return this.inventoryService.findOneProductInventory(shopId, slug);
+    return this.inventoryService.findOneProductInventory(slug, shopId);
   }
 
   @Post()
   @Roles('ADMIN', 'MANAGER', 'STAFF')
-  async update(@CurrentShopId() shopId: string, @Body() body: any) {
+  async update(
+    @CurrentUser() user: any,
+    @CurrentShopId() currentShopId: string,
+    @Body() body: any,
+  ) {
+    const shopId =
+      user.role === 'ADMIN' ? body.shopId || currentShopId : currentShopId;
     if (!shopId) {
-      throw new BadRequestException('Tài khoản của bạn không thuộc chi nhánh nào');
+      throw new BadRequestException('Vui lòng chọn chi nhánh');
     }
     const { productId, variantId, quantity } = body;
     if (!productId || !variantId || quantity === undefined) {
