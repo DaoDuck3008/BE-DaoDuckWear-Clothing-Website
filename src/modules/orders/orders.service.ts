@@ -161,9 +161,182 @@ export class OrdersService {
       .sort({ createdAt: -1 });
   }
 
-  async findOne(id: string) {
-    const order = await this.orderModel.findById(id);
+  async findOne(id: string, shopId?: string) {
+    const filter: any = { _id: id };
+    if (shopId) {
+      filter['items.shopId'] = new Types.ObjectId(shopId);
+    }
+    const order = await this.orderModel
+      .findOne(filter)
+      .populate('items.shopId', 'name');
     if (!order) throw new BadRequestException('Đơn hàng không tồn tại');
+    return order;
+  }
+
+  async findByCode(orderCode: string, shopId?: string) {
+    const filter: any = { orderCode };
+    if (shopId) {
+      filter['items.shopId'] = new Types.ObjectId(shopId);
+    }
+    const order = await this.orderModel
+      .findOne(filter)
+      .populate('items.shopId', 'name');
+    if (!order) throw new BadRequestException('Đơn hàng không tồn tại');
+    return order;
+  }
+
+  async findAllAdmin(query: any) {
+    const {
+      shopId,
+      status,
+      orderCode,
+      paymentStatus,
+      paymentMethod,
+      phone,
+      fromDate,
+      toDate,
+      page = 1,
+      limit = 10,
+    } = query;
+    const filter: any = {};
+
+    if (shopId) {
+      filter['items.shopId'] = new Types.ObjectId(shopId);
+    }
+
+    if (status) {
+      filter.status = status;
+    }
+
+    if (paymentStatus) {
+      filter.paymentStatus = paymentStatus;
+    }
+
+    if (paymentMethod) {
+      filter.paymentMethod = paymentMethod;
+    }
+
+    if (orderCode) {
+      filter.orderCode = { $regex: orderCode, $options: 'i' };
+    }
+
+    if (phone) {
+      filter['shippingAddress.phone'] = { $regex: phone, $options: 'i' };
+    }
+
+    if (fromDate || toDate) {
+      if (fromDate && toDate && new Date(fromDate) > new Date(toDate)) {
+        throw new BadRequestException(
+          'Ngày bắt đầu không được lớn hơn ngày kết thúc',
+        );
+      }
+
+      filter.createdAt = {};
+      if (fromDate) {
+        filter.createdAt.$gte = new Date(fromDate);
+      }
+      if (toDate) {
+        const endOfDay = new Date(toDate);
+        endOfDay.setHours(23, 59, 59, 999);
+        filter.createdAt.$lte = endOfDay;
+      }
+    }
+
+    const skip = (Number(page) - 1) * Number(limit);
+    const [data, total] = await Promise.all([
+      this.orderModel
+        .find(filter)
+        .populate('items.shopId', 'name')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(Number(limit)),
+      this.orderModel.countDocuments(filter),
+    ]);
+
+    return {
+      data,
+      page: Number(page),
+      limit: Number(limit),
+      totalPages: Math.ceil(total / Number(limit)),
+      totalItems: total,
+    };
+  }
+
+  async updateStatus(id: string, status: string, shopId: string) {
+    const order = await this.orderModel.findById(id);
+    if (!order) throw new NotFoundException('Đơn hàng không tồn tại');
+
+    // Authorization check: If shopId is provided, check if this order belongs to the shop
+    if (shopId) {
+      const hasItemFromShop = order.items.some(
+        (item) => item.shopId.toString() === shopId.toString(),
+      );
+      if (!hasItemFromShop) {
+        throw new BadRequestException(
+          'Bạn không có quyền cập nhật đơn hàng này',
+        );
+      }
+    }
+
+    // Handle stock if order is cancelled
+    if (
+      status === OrderStatus.CANCELLED &&
+      order.status !== OrderStatus.CANCELLED
+    ) {
+      const session = await this.connection.startSession();
+      session.startTransaction();
+      try {
+        for (const item of order.items) {
+          await this.inventoryModel.updateOne(
+            { variantId: item.variantId, shopId: item.shopId },
+            { $inc: { reservedQuantity: -item.quantity } },
+            { session },
+          );
+        }
+        order.status = status as OrderStatus;
+        await order.save({ session });
+        await session.commitTransaction();
+      } catch (error) {
+        await session.abortTransaction();
+        throw error;
+      } finally {
+        session.endSession();
+      }
+    } else if (
+      status === OrderStatus.COMPLETED &&
+      order.status !== OrderStatus.COMPLETED
+    ) {
+      // When completed, deduct from quantity and reservedQuantity
+      const session = await this.connection.startSession();
+      session.startTransaction();
+      try {
+        for (const item of order.items) {
+          await this.inventoryModel.updateOne(
+            { variantId: item.variantId, shopId: item.shopId },
+            {
+              $inc: {
+                quantity: -item.quantity,
+                reservedQuantity: -item.quantity,
+              },
+            },
+            { session },
+          );
+        }
+        order.status = status as OrderStatus;
+        order.paymentStatus = PaymentStatus.PAID;
+        await order.save({ session });
+        await session.commitTransaction();
+      } catch (error) {
+        await session.abortTransaction();
+        throw error;
+      } finally {
+        session.endSession();
+      }
+    } else {
+      order.status = status as OrderStatus;
+      await order.save();
+    }
+
     return order;
   }
 }
