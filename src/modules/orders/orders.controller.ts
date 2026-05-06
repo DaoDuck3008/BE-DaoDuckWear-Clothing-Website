@@ -24,15 +24,23 @@ export class OrdersController {
 
   @Post()
   @UseGuards(AuthGuard)
-  async create(@Body() createOrderDto: CreateOrderDto, @Req() req: any) {
-    const userId = req.user.id;
-    return this.ordersService.createOrder(createOrderDto, userId);
+  async create(
+    @Body() createOrderDto: CreateOrderDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.ordersService.createOrder(createOrderDto, user.id);
   }
 
   @UseGuards(AuthGuard)
   @Get('my-orders')
-  async findMyOrders(@Req() req: any) {
-    return this.ordersService.findMyOrders(req.user.id);
+  async findMyOrders(@CurrentUser() user: any, @Query() query: any) {
+    return this.ordersService.findMyOrders(user.id, query);
+  }
+
+  @UseGuards(AuthGuard)
+  @Patch('my-orders/:id/cancel')
+  async cancelMyOrder(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.ordersService.cancelMyOrder(id, user.id);
   }
 
   @Get('admin')

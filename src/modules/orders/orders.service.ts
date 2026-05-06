@@ -25,7 +25,6 @@ import { CreateOrderDto } from './dto/create-order.dto';
 import { generateUniqueHex } from 'src/common/utils/crypto.util';
 import { formatDateCode } from 'src/common/utils/date.util';
 
-import { Cart, CartDocument } from '../cart/schemas/cart.schema';
 import { CartService } from '../cart/cart.service';
 
 @Injectable()
@@ -51,7 +50,7 @@ export class OrdersService {
       const snapshotItems: any[] = [];
       let totalAmount = 0;
 
-      // 1. Determine items source: buyNowItem OR cart
+      // 1. Xác định nguồn hàng hóa: buyNowItem hoặc giỏ hàng
       const itemsToProcess = buyNowItem
         ? [buyNowItem]
         : (await this.cartService.getCart(userId)).items;
@@ -60,7 +59,7 @@ export class OrdersService {
         throw new NotFoundException('Giỏ hàng không tồn tại hoặc đã trống');
       }
 
-      // 2. Validate items and build snapshot
+      // 2. Kiểm tra tính hợp lệ của sản phẩm và dựng snapshot
       for (const currentItem of itemsToProcess) {
         const product = await this.productModel
           .findById(currentItem.productId)
@@ -79,7 +78,7 @@ export class OrdersService {
           );
         }
 
-        // Check Inventory SPECIFIC to the shop linked to this item
+        // Kiểm tra tồn kho SPECIFIC to the shop linked to this item
         const inventory = await this.inventoryModel
           .findOne({
             variantId: variant._id,
@@ -97,11 +96,11 @@ export class OrdersService {
           );
         }
 
-        // Reserve stock
+        // Đặt hàng trong kho
         inventory.reservedQuantity += currentItem.quantity;
         await inventory.save({ session });
 
-        // Build snapshot
+        // Dựng snapshot sản phẩm khi mua
         const itemPrice = variant.price || product.basePrice;
         totalAmount += itemPrice * currentItem.quantity;
 
@@ -124,7 +123,7 @@ export class OrdersService {
       const finalTotal = totalAmount + shippingFee;
       const orderCode = `DDW-${formatDateCode()}-${generateUniqueHex()}`;
 
-      // 3. Create Order
+      // 3. Tạo đơn hàng
       const newOrder = new this.orderModel({
         orderCode,
         userId: userId ? new Types.ObjectId(userId) : null,
@@ -140,7 +139,7 @@ export class OrdersService {
 
       await newOrder.save({ session });
 
-      // 4. Delete Cart after successful order IF NOT BUY NOW
+      // 4. Xóa giỏ hàng sau khi tạo đơn nếu không phải mua ngay
       if (!buyNowItem) {
         await this.cartService.clearCart(userId);
       }
@@ -155,10 +154,65 @@ export class OrdersService {
     }
   }
 
-  async findMyOrders(userId: string) {
-    return this.orderModel
-      .find({ userId: new Types.ObjectId(userId) })
-      .sort({ createdAt: -1 });
+  async findMyOrders(userId: string, query: any = {}) {
+    const {
+      status,
+      orderCode,
+      paymentStatus,
+      paymentMethod,
+      fromDate,
+      toDate,
+      page = 1,
+      limit = 10,
+    } = query;
+
+    const filter: any = { userId: new Types.ObjectId(userId) };
+
+    if (status) {
+      filter.status = status;
+    }
+
+    if (paymentStatus) {
+      filter.paymentStatus = paymentStatus;
+    }
+
+    if (paymentMethod) {
+      filter.paymentMethod = paymentMethod;
+    }
+
+    if (orderCode) {
+      filter.orderCode = { $regex: orderCode, $options: 'i' };
+    }
+
+    if (fromDate || toDate) {
+      filter.createdAt = {};
+      if (fromDate) {
+        filter.createdAt.$gte = new Date(fromDate);
+      }
+      if (toDate) {
+        const endOfDay = new Date(toDate);
+        endOfDay.setHours(23, 59, 59, 999);
+        filter.createdAt.$lte = endOfDay;
+      }
+    }
+
+    const skip = (Number(page) - 1) * Number(limit);
+    const [data, total] = await Promise.all([
+      this.orderModel
+        .find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(Number(limit)),
+      this.orderModel.countDocuments(filter),
+    ]);
+
+    return {
+      data,
+      page: Number(page),
+      limit: Number(limit),
+      totalPages: Math.ceil(total / Number(limit)),
+      totalItems: total,
+    };
   }
 
   async findOne(id: string, shopId?: string) {
@@ -266,7 +320,7 @@ export class OrdersService {
     const order = await this.orderModel.findById(id);
     if (!order) throw new NotFoundException('Đơn hàng không tồn tại');
 
-    // Authorization check: If shopId is provided, check if this order belongs to the shop
+    // Kiểm tra quyền sở hữu: Nếu shopId được cung cấp, kiểm tra xem đơn hàng này có thuộc về shop không
     if (shopId) {
       const hasItemFromShop = order.items.some(
         (item) => item.shopId.toString() === shopId.toString(),
@@ -278,35 +332,17 @@ export class OrdersService {
       }
     }
 
-    // Handle stock if order is cancelled
+    // Xử lý khi đơn hàng được hủy
     if (
       status === OrderStatus.CANCELLED &&
       order.status !== OrderStatus.CANCELLED
     ) {
-      const session = await this.connection.startSession();
-      session.startTransaction();
-      try {
-        for (const item of order.items) {
-          await this.inventoryModel.updateOne(
-            { variantId: item.variantId, shopId: item.shopId },
-            { $inc: { reservedQuantity: -item.quantity } },
-            { session },
-          );
-        }
-        order.status = status as OrderStatus;
-        await order.save({ session });
-        await session.commitTransaction();
-      } catch (error) {
-        await session.abortTransaction();
-        throw error;
-      } finally {
-        session.endSession();
-      }
+      return this.processCancellation(order);
     } else if (
       status === OrderStatus.COMPLETED &&
       order.status !== OrderStatus.COMPLETED
     ) {
-      // When completed, deduct from quantity and reservedQuantity
+      // Khi đơn hàng được hoàn thành, trừ số lượng đã đặt và số lượng đã reserved
       const session = await this.connection.startSession();
       session.startTransaction();
       try {
@@ -338,5 +374,49 @@ export class OrdersService {
     }
 
     return order;
+  }
+
+  async cancelMyOrder(id: string, userId: string) {
+    const order = await this.orderModel.findById(id);
+    if (!order) throw new NotFoundException('Đơn hàng không tồn tại');
+
+    // 1. Kiểm tra quyền sở hữu
+    if (order.userId?.toString() !== userId) {
+      throw new BadRequestException('Bạn không có quyền hủy đơn hàng này');
+    }
+
+    // 2. Kiểm tra trạng thái đơn hàng
+    const allowedStatus = [OrderStatus.PENDING, OrderStatus.CONFIRMED];
+    if (!allowedStatus.includes(order.status)) {
+      throw new BadRequestException(
+        'Chỉ có thể hủy đơn hàng khi đang chờ xử lý hoặc đã xác nhận',
+      );
+    }
+
+    // 3. Xử lý hủy đơn hàng (giải phóng stock reservation)
+    return this.processCancellation(order);
+  }
+
+  private async processCancellation(order: OrderDocument) {
+    const session = await this.connection.startSession();
+    session.startTransaction();
+    try {
+      for (const item of order.items) {
+        await this.inventoryModel.updateOne(
+          { variantId: item.variantId, shopId: item.shopId },
+          { $inc: { reservedQuantity: -item.quantity } },
+          { session },
+        );
+      }
+      order.status = OrderStatus.CANCELLED;
+      await order.save({ session });
+      await session.commitTransaction();
+      return order;
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
   }
 }
