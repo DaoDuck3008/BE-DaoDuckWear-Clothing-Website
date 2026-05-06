@@ -15,6 +15,7 @@ import { DatabaseModule } from './database/database.module';
 import { RolesModule } from './modules/roles/roles.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
+import { BannersModule } from './modules/banners/banners.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { InventoryModule } from './modules/inventory/inventory.module';
     FavoritesModule,
     ColorsModule,
     OrdersModule,
+    BannersModule,
     HealthModule,
   ],
   controllers: [],

@@ -109,4 +109,23 @@ export class CloudinaryService {
 
     return await Promise.all(uploadPromises);
   }
+
+  public async uploadBannerImage(
+    file: Express.Multer.File,
+    type: 'desktop' | 'mobile',
+  ): Promise<{ url: string; publicId: string }> {
+    // public_id: banner_desktop_<timestamp> hoặc banner_mobile_<timestamp>
+    const publicId = `banner_${type}_${Date.now()}`;
+    const result = await this.uploadImage(file, 'banners', publicId);
+    return { url: result.secure_url, publicId: result.public_id };
+  }
+
+  public async deleteBannerImage(fullPublicId: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      cloudinary.uploader.destroy(fullPublicId, (error) => {
+        if (error) return reject(error);
+        resolve();
+      });
+    });
+  }
 }
