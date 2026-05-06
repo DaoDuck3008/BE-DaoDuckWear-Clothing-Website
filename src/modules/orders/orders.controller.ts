@@ -54,7 +54,7 @@ export class OrdersController {
   @UseGuards(AuthGuard, RolesGuard)
   @Roles('ADMIN', 'MANAGER', 'STAFF')
   async findOneAdmin(@Param('id') id: string, @CurrentShopId() shopId: string) {
-    return this.ordersService.findOne(id, shopId);
+    return this.ordersService.findOneAdmin(id, shopId);
   }
 
   @Get('admin/code/:orderCode')
@@ -81,10 +81,6 @@ export class OrdersController {
   @UseGuards(AuthGuard)
   @Get(':id')
   async findOne(@Param('id') id: string, @CurrentUser() user: any) {
-    const order = await this.ordersService.findOne(id);
-    if (order?.userId?.toString() !== user.id && user.role === 'USER') {
-      throw new BadRequestException('Bạn không có quyền xem đơn hàng này');
-    }
-    return order;
+    return this.ordersService.findOneUser(id, user.id);
   }
 }

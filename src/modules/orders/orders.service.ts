@@ -215,13 +215,21 @@ export class OrdersService {
     };
   }
 
-  async findOne(id: string, shopId?: string) {
+  async findOneAdmin(id: string, shopId?: string) {
     const filter: any = { _id: id };
     if (shopId) {
       filter['items.shopId'] = new Types.ObjectId(shopId);
     }
     const order = await this.orderModel
       .findOne(filter)
+      .populate('items.shopId', 'name');
+    if (!order) throw new BadRequestException('Đơn hàng không tồn tại');
+    return order;
+  }
+
+  async findOneUser(id: string, userId: string) {
+    const order = await this.orderModel
+      .findOne({ _id: id, userId })
       .populate('items.shopId', 'name');
     if (!order) throw new BadRequestException('Đơn hàng không tồn tại');
     return order;
