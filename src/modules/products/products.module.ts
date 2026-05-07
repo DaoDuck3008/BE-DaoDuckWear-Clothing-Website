@@ -12,6 +12,7 @@ import {
   Inventory,
   InventorySchema,
 } from '../inventory/schemas/inventory.schema';
+import { Category, CategorySchema } from '../categories/schemas/category.schema';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import {
       { name: ProductVariant.name, schema: ProductVariantSchema },
       { name: Shop.name, schema: ShopSchema },
       { name: Inventory.name, schema: InventorySchema },
+      { name: Category.name, schema: CategorySchema},
     ]),
   ],
   controllers: [ProductsController],

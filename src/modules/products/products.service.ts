@@ -13,6 +13,7 @@ import { Product, ProductImage } from './schemas/product.schema';
 import { ProductVariant } from './schemas/product-variant.schema';
 import { SlugGenerator } from '../../common/utils/slug.util';
 import { Inventory } from '../inventory/schemas/inventory.schema';
+import { Category } from '../categories/schemas/category.schema';
 
 @Injectable()
 export class ProductsService {
@@ -21,6 +22,7 @@ export class ProductsService {
     @InjectModel(Product.name) private readonly productModel: Model<any>,
     @InjectModel(ProductVariant.name) private readonly variantModel: Model<any>,
     @InjectModel(Inventory.name) private readonly inventoryModel: Model<any>,
+    @InjectModel(Category.name) private readonly categoryModel: Model<any>,
     private readonly cloudinary: CloudinaryService,
   ) {}
 
@@ -156,7 +158,15 @@ export class ProductsService {
     // 2. Xây dựng filter cho Product
     const productFilter: any = { deletedAt: null, status: 'active' };
     if (productIds) productFilter._id = { $in: productIds };
-    if (categoryId) productFilter.categoryId = this.toObjectId(categoryId);
+    if (categoryId) {
+      const children = await this.categoryModel.find({ parentId: this.toObjectId(categoryId) });
+      if (children.length > 0) {
+        const childrenIds = children.map((c) => this.toObjectId(c._id));
+        productFilter.categoryId = { $in: [this.toObjectId(categoryId), ...childrenIds] };
+      } else {
+        productFilter.categoryId = this.toObjectId(categoryId);
+      }
+    }
 
     // Filter theo giá
     if (minPrice || maxPrice) {
@@ -202,7 +212,16 @@ export class ProductsService {
 
     if (status) filter.status = status;
     if (search) filter.name = { $regex: search, $options: 'i' };
-    if (categoryId) filter.categoryId = this.toObjectId(categoryId);
+    // if (categoryId) filter.categoryId = this.toObjectId(categoryId);
+    if (categoryId) {
+      const children = await this.categoryModel.find({ parentId: this.toObjectId(categoryId) });
+      if (children.length > 0) {
+        const childrenIds = children.map((c) => this.toObjectId(c._id));
+        filter.categoryId = { $in: [this.toObjectId(categoryId), ...childrenIds] };
+      } else {
+        filter.categoryId = this.toObjectId(categoryId);
+      }
+    }
 
     if (shopId) {
       const productIds = await this.inventoryModel.distinct('productId', {
