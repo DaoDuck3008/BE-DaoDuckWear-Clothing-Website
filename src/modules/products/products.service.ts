@@ -193,16 +193,16 @@ export class ProductsService {
     shopId?: string;
     status?: string;
     search?: string;
+    categoryId?: string;
+    sort?: string;
   }) {
-    const { shopId, status, search } = query;
+    const { shopId, status, search, categoryId, sort } = query;
     const filter: any = { deletedAt: null };
 
     if (status) filter.status = status;
-    if (search) {
-      filter.name = { $regex: search, $options: 'i' }; // i: case insensitive
-    }
+    if (search) filter.name = { $regex: search, $options: 'i' };
+    if (categoryId) filter.categoryId = this.toObjectId(categoryId);
 
-    // Nếu có shopId, chỉ lấy sản phẩm có tồn kho tại shop đó
     if (shopId) {
       const productIds = await this.inventoryModel.distinct('productId', {
         shopId: this.toObjectId(shopId),
@@ -210,12 +210,37 @@ export class ProductsService {
       filter._id = { $in: productIds };
     }
 
+    let sortOptions: any = { createdAt: -1 };
+    if (sort === 'name_asc') sortOptions = { name: 1 };
+    if (sort === 'name_desc') sortOptions = { name: -1 };
+    if (sort === 'price_asc') sortOptions = { basePrice: 1 };
+    if (sort === 'price_desc') sortOptions = { basePrice: -1 };
+    if (sort === 'newest') sortOptions = { createdAt: -1 };
+    if (sort === 'oldest') sortOptions = { createdAt: 1 };
+
     const products = await this.productModel
       .find(filter)
-      .sort({ createdAt: -1 })
+      .sort(sortOptions)
       .populate('categoryId');
 
-    return products;
+    // Đếm số biến thể còn hoạt động cho mỗi sản phẩm
+    const productIds = products.map((p) => p._id);
+    const variantCounts = await this.variantModel.aggregate([
+      { $match: { productId: { $in: productIds }, deletedAt: null } },
+      { $group: { _id: '$productId', count: { $sum: 1 } } },
+    ]);
+    const countMap = variantCounts.reduce(
+      (acc, v) => {
+        acc[v._id.toString()] = v.count;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+
+    return products.map((p) => ({
+      ...(p.toJSON ? p.toJSON() : p),
+      variantCount: countMap[p._id.toString()] || 0,
+    }));
   }
 
   async findBySlug(slug: string) {
