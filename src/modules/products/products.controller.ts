@@ -47,7 +47,7 @@ export class ProductsController {
 
   @Get('admin')
   @UseGuards(AuthGuard, RolesGuard)
-  @Roles('ADMIN', 'SHOP_ADMIN')
+  @Roles('ADMIN', 'MANAGER')
   async findAllAdmin(@CurrentShopId() shopId: string, @Query() query: any) {
     return this.productsService.findAllAdmin({ shopId, ...query });
   }
