@@ -8,6 +8,7 @@ import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Connection, Model, Types } from 'mongoose';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { CreateProductDto } from './dto/create-product.dto';
+import { UpdateProductDto } from './dto/update-product.dto';
 import { Product, ProductImage } from './schemas/product.schema';
 import { ProductVariant } from './schemas/product-variant.schema';
 import { SlugGenerator } from '../../common/utils/slug.util';
@@ -293,7 +294,7 @@ export class ProductsService {
 
   async update(
     id: string,
-    updateProductDto: any,
+    updateProductDto: UpdateProductDto,
     files: Express.Multer.File[], // File ảnh mới
   ) {
     const product = await this.productModel.findById(id);
@@ -317,11 +318,7 @@ export class ProductsService {
 
     // 1. Xóa tham chiếu ảnh cũ khỏi DB
     let currentImages = [...product.images];
-    const idsToDelete: string[] = deleteImageIds
-      ? typeof deleteImageIds === 'string'
-        ? JSON.parse(deleteImageIds)
-        : deleteImageIds
-      : [];
+    const idsToDelete: string[] = deleteImageIds ?? [];
 
     if (idsToDelete.length > 0) {
       currentImages = currentImages.filter(
@@ -362,8 +359,7 @@ export class ProductsService {
 
         // 4. Cập nhật Variants (Đồng bộ: Thêm/Sửa/Xóa mềm)
         if (variants) {
-          const variantsList =
-            typeof variants === 'string' ? JSON.parse(variants) : variants;
+          const variantsList = variants;
 
           // Lấy danh sách ID variant hiện tại trong DB (chưa xóa)
           const currentVariants = await this.variantModel
@@ -405,6 +401,7 @@ export class ProductsService {
                   ...(v.sku && { sku: v.sku }),
                   ...(v.size && { size: v.size }),
                   ...(v.color && { color: upperColor }),
+                  colorHexId: v.colorHexId ? this.toObjectId(v.colorHexId) : null,
                   image: variantImage?.url || null,
                   imagePublicId: variantImage?.publicId || null,
                 },
@@ -419,6 +416,7 @@ export class ProductsService {
                     sku: v.sku || `SKU-${Date.now()}-${Math.random()}`,
                     size: v.size,
                     color: upperColor,
+                    colorHexId: v.colorHexId ? this.toObjectId(v.colorHexId) : null,
                     price: Number(v.price || basePrice),
                     image: variantImage?.url || null,
                     imagePublicId: variantImage?.publicId || null,

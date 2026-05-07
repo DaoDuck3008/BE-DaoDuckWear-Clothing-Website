@@ -14,6 +14,7 @@ import {
 import { AnyFilesInterceptor } from '@nestjs/platform-express';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
+import { UpdateProductDto } from './dto/update-product.dto';
 import { AuthGuard } from '../../common/guards/auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -69,9 +70,21 @@ export class ProductsController {
     @Param('id') id: string,
     @Body() body: any,
     @UploadedFiles() files: Express.Multer.File[],
-    @CurrentShopId() shopId: string,
   ) {
-    return this.productsService.update(id, body, files);
+    const updateProductDto: UpdateProductDto = {
+      ...body,
+      variants:
+        typeof body.variants === 'string'
+          ? JSON.parse(body.variants)
+          : body.variants,
+      deleteImageIds:
+        typeof body.deleteImageIds === 'string'
+          ? JSON.parse(body.deleteImageIds)
+          : body.deleteImageIds,
+      basePrice: body.basePrice ? Number(body.basePrice) : undefined,
+    };
+
+    return this.productsService.update(id, updateProductDto, files);
   }
 
   @Delete(':id')
