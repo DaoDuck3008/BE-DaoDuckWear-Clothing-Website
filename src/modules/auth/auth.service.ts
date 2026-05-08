@@ -1,11 +1,13 @@
 import {
+  BadRequestException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { RegisterDto, LoginDto } from './dto/auth.dto';
+import { RegisterDto, LoginDto, UpdateProfileDto } from './dto/auth.dto';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import {
   hashPassword,
   comparePassword,
@@ -24,6 +26,7 @@ export class AuthService {
   constructor(
     @InjectModel(User.name) private readonly userModel: Model<any>,
     @InjectModel(Role.name) private readonly roleModel: Model<any>,
+    private readonly cloudinaryService: CloudinaryService,
   ) {}
 
   async register(body: RegisterDto) {
@@ -215,6 +218,61 @@ export class AuthService {
     }
   }
 
+  async updateProfile(userId: string, dto: UpdateProfileDto) {
+    const user = await this.userModel.findById(userId);
+    if (!user) throw new NotFoundException('Không tìm thấy tài khoản');
+
+    if (dto.username !== undefined) {
+      const conflict = await this.userModel
+        .findOne({ username: dto.username, _id: { $ne: userId } })
+        .lean();
+      if (conflict)
+        throw new BadRequestException('Tên người dùng đã tồn tại');
+    }
+
+    const setFields: Record<string, any> = {};
+    if (dto.username !== undefined) setFields.username = dto.username;
+
+    if (dto.phone !== undefined) {
+      if (user.addresses && user.addresses.length > 0) {
+        setFields['addresses.0.phone'] = dto.phone;
+      }
+    }
+
+    const updateQuery: Record<string, any> = {};
+    if (Object.keys(setFields).length > 0) updateQuery.$set = setFields;
+    if (dto.phone !== undefined && !(user.addresses && user.addresses.length > 0)) {
+      updateQuery.$push = { addresses: { phone: dto.phone, address: '' } };
+    }
+
+    const updated = await this.userModel
+      .findByIdAndUpdate(userId, updateQuery, { new: true })
+      .populate('roleId');
+
+    const role = updated.roleId as any;
+    return {
+      id: updated._id,
+      username: updated.username,
+      email: updated.email,
+      avatar: updated.avatar || '',
+      role: role?.name,
+      phone: updated.addresses?.[0]?.phone || '',
+    };
+  }
+
+  async uploadAvatar(userId: string, file: Express.Multer.File) {
+    const user = await this.userModel.findById(userId);
+    if (!user) throw new NotFoundException('Không tìm thấy tài khoản');
+
+    const { url } = await this.cloudinaryService.uploadAvatarImage(
+      file,
+      userId,
+    );
+    await this.userModel.findByIdAndUpdate(userId, { avatar: url });
+
+    return { avatar: url };
+  }
+
   async getProfile(userId: string) {
     const user = await this.userModel.findById(userId).populate('roleId');
 
@@ -235,6 +293,7 @@ export class AuthService {
       role: role.name,
       address: user.addresses?.length > 0 ? user.addresses[0].address : '',
       phone: user.addresses?.length > 0 ? user.addresses[0].phone : '',
+      createdAt: user.createdAt,
     };
   }
 }

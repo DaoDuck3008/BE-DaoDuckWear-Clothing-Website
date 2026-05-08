@@ -45,3 +45,15 @@ export class LoginDto {
   @IsOptional()
   rememberMe?: boolean;
 }
+
+export class UpdateProfileDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(2, { message: 'Tên phải có ít nhất 2 ký tự' })
+  username?: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^(0|\+84)[0-9]{8,9}$/, { message: 'Số điện thoại không hợp lệ' })
+  phone?: string;
+}

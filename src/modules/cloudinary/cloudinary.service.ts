@@ -120,6 +120,15 @@ export class CloudinaryService {
     return { url: result.secure_url, publicId: result.public_id };
   }
 
+  public async uploadAvatarImage(
+    file: Express.Multer.File,
+    userId: string,
+  ): Promise<{ url: string; publicId: string }> {
+    const publicId = `avatar_${userId}_${Date.now()}`;
+    const result = await this.uploadImage(file, 'avatars', publicId);
+    return { url: result.secure_url, publicId: result.public_id };
+  }
+
   public async deleteBannerImage(fullPublicId: string): Promise<void> {
     return new Promise((resolve, reject) => {
       cloudinary.uploader.destroy(fullPublicId, (error) => {

@@ -1,15 +1,20 @@
 import {
   Controller,
   Post,
+  Patch,
   Body,
   Res,
   Get,
   Req,
   UseGuards,
   UnauthorizedException,
+  BadRequestException,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthService } from './auth.service';
-import { RegisterDto, LoginDto } from './dto/auth.dto';
+import { RegisterDto, LoginDto, UpdateProfileDto } from './dto/auth.dto';
 import { Response, Request } from 'express';
 import { AuthGuard } from '../../common/guards/auth.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -114,6 +119,26 @@ export class AuthController {
   @UseGuards(AuthGuard)
   async getProfile(@CurrentUser() user: any) {
     return this.authService.getProfile(user.id);
+  }
+
+  @Patch('profile')
+  @UseGuards(AuthGuard)
+  async updateProfile(
+    @CurrentUser() user: any,
+    @Body() dto: UpdateProfileDto,
+  ) {
+    return this.authService.updateProfile(user.id, dto);
+  }
+
+  @Post('profile/avatar')
+  @UseGuards(AuthGuard)
+  @UseInterceptors(FileInterceptor('avatar'))
+  async uploadAvatar(
+    @CurrentUser() user: any,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) throw new BadRequestException('Không có file được upload');
+    return this.authService.uploadAvatar(user.id, file);
   }
 
   @Post('logout')
