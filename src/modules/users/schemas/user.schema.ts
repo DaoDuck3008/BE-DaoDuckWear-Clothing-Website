@@ -47,6 +47,9 @@ export class User {
   @Prop({ type: [AddressSchema], default: [] })
   addresses!: Address[];
 
+  @Prop({ type: Boolean, default: false })
+  isVerified!: boolean;
+
   @Prop({ type: Date, default: null })
   deletedAt?: Date | null;
 }

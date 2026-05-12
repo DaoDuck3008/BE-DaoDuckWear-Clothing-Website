@@ -14,7 +14,15 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthService } from './auth.service';
-import { RegisterDto, LoginDto, UpdateProfileDto } from './dto/auth.dto';
+import {
+  RegisterDto,
+  LoginDto,
+  UpdateProfileDto,
+  VerifyEmailDto,
+  ResendVerifyEmailDto,
+  ForgotPasswordDto,
+  ResetPasswordDto,
+} from './dto/auth.dto';
 import { Response, Request } from 'express';
 import { AuthGuard } from '../../common/guards/auth.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -27,10 +35,14 @@ export class AuthController {
 
   @Post('register')
   async register(@Body() body: RegisterDto) {
-    const user = await this.authService.register(body);
+    const { user, requiresVerification } =
+      await this.authService.register(body);
     return {
       success: true,
-      message: 'User registered successfully',
+      message: requiresVerification
+        ? 'Đăng ký thành công. Vui lòng kiểm tra email để xác thực tài khoản'
+        : 'Đăng ký thành công',
+      requiresVerification,
       user: {
         id: user.id,
         email: user.email,
@@ -40,13 +52,44 @@ export class AuthController {
     };
   }
 
+  @Post('forgot-password')
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(dto.email);
+  }
+
+  @Post('reset-password')
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto.email, dto.code, dto.newPassword);
+  }
+
+  @Post('verify-email')
+  async verifyEmail(@Body() dto: VerifyEmailDto) {
+    return this.authService.verifyEmail(dto.email, dto.code);
+  }
+
+  @Post('resend-verify-email')
+  async resendVerifyEmail(@Body() dto: ResendVerifyEmailDto) {
+    return this.authService.resendVerifyEmail(dto.email);
+  }
+
   @Post('login')
   async login(
     @Body() body: LoginDto,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const { user, accessToken, refreshToken } =
-      await this.authService.login(body);
+    const result = await this.authService.login(body);
+
+    // Nếu như tài khoản chưa được verify (service trả về requiresVerification = true)
+    if (result.requiresVerification) {
+      return {
+        success: true,
+        requiresVerification: true,
+        email: result.email,
+        message: result.message,
+      };
+    }
+
+    const { user, accessToken, refreshToken } = result;
 
     const maxAge = body.rememberMe
       ? 7 * 24 * 60 * 60 * 1000
@@ -62,7 +105,7 @@ export class AuthController {
     return {
       success: true,
       message: 'User logged in successfully',
-      accessToken: accessToken,
+      accessToken,
       user: {
         id: user.id,
         email: user.email,
@@ -90,7 +133,7 @@ export class AuthController {
       httpOnly: true,
       secure: true,
       sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days for google login
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 ngày với google login
     });
 
     return {
@@ -98,7 +141,7 @@ export class AuthController {
       message: 'Đăng nhập với Google thành công!',
       accessToken: accessToken,
       user: {
-        id: user.id,
+        id: user.id.toString(),
         email: user.email,
         username: user.username,
         avatar: user.avatar || '',
@@ -123,10 +166,7 @@ export class AuthController {
 
   @Patch('profile')
   @UseGuards(AuthGuard)
-  async updateProfile(
-    @CurrentUser() user: any,
-    @Body() dto: UpdateProfileDto,
-  ) {
+  async updateProfile(@CurrentUser() user: any, @Body() dto: UpdateProfileDto) {
     return this.authService.updateProfile(user.id, dto);
   }
 

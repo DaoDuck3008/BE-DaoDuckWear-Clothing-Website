@@ -85,6 +85,7 @@ async function main() {
       password: passwordHash,
       roleId: roleMap.get(user.role),
       addresses: [],
+      isVerified: true,
     })),
   );
 
@@ -95,6 +96,7 @@ async function main() {
       password: passwordHash,
       roleId: roleMap.get('USER'),
       addresses: [],
+      isVerified: true,
     })),
   );
 
