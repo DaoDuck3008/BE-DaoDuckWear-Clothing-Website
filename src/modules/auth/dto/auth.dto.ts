@@ -80,6 +80,22 @@ export class ForgotPasswordDto {
   email!: string;
 }
 
+export class ChangePasswordDto {
+  @IsString()
+  @MinLength(6, { message: 'Mật khẩu phải có ít nhất 6 ký tự' })
+  currentPassword!: string;
+
+  @IsString()
+  @MinLength(6, { message: 'Mật khẩu phải có ít nhất 6 ký tự' })
+  @Matches(/[A-Z]/, { message: 'Mật khẩu phải chứa ít nhất 1 chữ in hoa' })
+  @Matches(/\d/, { message: 'Mật khẩu phải chứa ít nhất 1 chữ số' })
+  newPassword!: string;
+
+  @IsString()
+  @IsMatch('newPassword', { message: 'Mật khẩu xác nhận không khớp' })
+  confirmPassword!: string;
+}
+
 export class ResetPasswordDto {
   @IsEmail({}, { message: 'Email không hợp lệ' })
   email!: string;

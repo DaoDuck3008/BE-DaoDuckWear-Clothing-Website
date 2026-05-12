@@ -22,6 +22,7 @@ import {
   ResendVerifyEmailDto,
   ForgotPasswordDto,
   ResetPasswordDto,
+  ChangePasswordDto,
 } from './dto/auth.dto';
 import { Response, Request } from 'express';
 import { AuthGuard } from '../../common/guards/auth.guard';
@@ -168,6 +169,12 @@ export class AuthController {
   @UseGuards(AuthGuard)
   async updateProfile(@CurrentUser() user: any, @Body() dto: UpdateProfileDto) {
     return this.authService.updateProfile(user.id, dto);
+  }
+
+  @Patch('change-password')
+  @UseGuards(AuthGuard)
+  async changePassword(@CurrentUser() user: any, @Body() dto: ChangePasswordDto) {
+    return this.authService.changePassword(user.id, dto);
   }
 
   @Post('profile/avatar')

@@ -6,7 +6,12 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { RegisterDto, LoginDto, UpdateProfileDto } from './dto/auth.dto';
+import {
+  RegisterDto,
+  LoginDto,
+  UpdateProfileDto,
+  ChangePasswordDto,
+} from './dto/auth.dto';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { MailService } from '../mail/mail.service';
 import { RedisService } from '../redis/redis.service';
@@ -40,7 +45,11 @@ export class AuthService {
 
   private async sendOtp(userId: string, email: string) {
     const code = generateOtp();
-    await this.redisService.set(`email_verify:user:${userId}`, code, VERIFY_TTL);
+    await this.redisService.set(
+      `email_verify:user:${userId}`,
+      code,
+      VERIFY_TTL,
+    );
     await this.mailService.sendVerifyEmail(email, code);
   }
 
@@ -115,7 +124,8 @@ export class AuthService {
       return {
         requiresVerification: true,
         email: user.email,
-        message: 'Email chưa được xác thực. Mã xác thực đã được gửi đến hộp thư của bạn',
+        message:
+          'Email chưa được xác thực. Mã xác thực đã được gửi đến hộp thư của bạn',
       };
     }
 
@@ -149,7 +159,9 @@ export class AuthService {
     }
 
     const userId = user._id.toString();
-    const storedCode = await this.redisService.get(`email_verify:user:${userId}`);
+    const storedCode = await this.redisService.get(
+      `email_verify:user:${userId}`,
+    );
 
     if (!storedCode || storedCode !== code) {
       throw new BadRequestException('Mã xác thực không hợp lệ hoặc đã hết hạn');
@@ -165,7 +177,11 @@ export class AuthService {
     const user = await this.userModel.findOne({ email }).lean();
 
     if (!user) {
-      return { success: true, message: 'Nếu email tồn tại, mã đặt lại mật khẩu sẽ được gửi đến hộp thư của bạn' };
+      return {
+        success: true,
+        message:
+          'Nếu email tồn tại, mã đặt lại mật khẩu sẽ được gửi đến hộp thư của bạn',
+      };
     }
 
     if (user.provider === 'google') {
@@ -179,7 +195,11 @@ export class AuthService {
     await this.redisService.set(`pwd_reset:user:${userId}`, code, VERIFY_TTL);
     await this.mailService.sendResetPasswordEmail(email, code);
 
-    return { success: true, message: 'Nếu email tồn tại, mã đặt lại mật khẩu sẽ được gửi đến hộp thư của bạn' };
+    return {
+      success: true,
+      message:
+        'Nếu email tồn tại, mã đặt lại mật khẩu sẽ được gửi đến hộp thư của bạn',
+    };
   }
 
   async resetPassword(email: string, code: string, newPassword: string) {
@@ -197,7 +217,9 @@ export class AuthService {
     }
 
     const hashedPassword = await hashPassword(newPassword);
-    await this.userModel.findByIdAndUpdate(userId, { password: hashedPassword });
+    await this.userModel.findByIdAndUpdate(userId, {
+      password: hashedPassword,
+    });
     await this.redisService.del(`pwd_reset:user:${userId}`);
 
     return { success: true, message: 'Đặt lại mật khẩu thành công' };
@@ -216,7 +238,10 @@ export class AuthService {
 
     await this.sendOtp(user._id.toString(), email);
 
-    return { success: true, message: 'Mã xác thực mới đã được gửi đến email của bạn' };
+    return {
+      success: true,
+      message: 'Mã xác thực mới đã được gửi đến email của bạn',
+    };
   }
 
   async refresh(refreshToken: string) {
@@ -369,11 +394,35 @@ export class AuthService {
     };
   }
 
+  async changePassword(userId: string, dto: ChangePasswordDto) {
+    const user = await this.userModel.findById(userId);
+    if (!user) throw new NotFoundException('Không tìm thấy tài khoản');
+
+    if (user.provider === 'google') {
+      throw new BadRequestException('Tài khoản Google không thể đổi mật khẩu');
+    }
+
+    // So sánh mật khẩu hiện tại
+    const isMatch = await comparePassword(dto.currentPassword, user.password);
+    if (!isMatch) {
+      throw new UnauthorizedException('Mật khẩu hiện tại không đúng');
+    }
+
+    // Hash mật khẩu mới
+    const hashed = await hashPassword(dto.newPassword);
+    await this.userModel.findByIdAndUpdate(userId, { password: hashed });
+
+    return { success: true, message: 'Đổi mật khẩu thành công' };
+  }
+
   async uploadAvatar(userId: string, file: Express.Multer.File) {
     const user = await this.userModel.findById(userId);
     if (!user) throw new NotFoundException('Không tìm thấy tài khoản');
 
-    const { url } = await this.cloudinaryService.uploadAvatarImage(file, userId);
+    const { url } = await this.cloudinaryService.uploadAvatarImage(
+      file,
+      userId,
+    );
     await this.userModel.findByIdAndUpdate(userId, { avatar: url });
 
     return { avatar: url };
@@ -397,6 +446,7 @@ export class AuthService {
       fullName: user.username,
       email: user.email,
       role: role.name,
+      provider: user.provider || 'local',
       address: user.addresses?.length > 0 ? user.addresses[0].address : '',
       phone: user.addresses?.length > 0 ? user.addresses[0].phone : '',
       createdAt: user.createdAt,
