@@ -16,11 +16,14 @@ import { RolesModule } from './modules/roles/roles.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { BannersModule } from './modules/banners/banners.module';
+import { MailModule } from './modules/mail/mail.module';
+import { RedisModule } from './modules/redis/redis.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
     DatabaseModule,
+    RedisModule,
     RolesModule,
     AuthModule,
     UsersModule,
@@ -34,6 +37,7 @@ import { BannersModule } from './modules/banners/banners.module';
     ColorsModule,
     OrdersModule,
     BannersModule,
+    MailModule,
     HealthModule,
   ],
   controllers: [],
