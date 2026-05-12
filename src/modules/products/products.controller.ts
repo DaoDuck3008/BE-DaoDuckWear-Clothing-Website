@@ -57,6 +57,14 @@ export class ProductsController {
     return this.productsService.findAll(query);
   }
 
+  @Get(':slug/similar')
+  async getSimilar(
+    @Param('slug') slug: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.productsService.getSimilarProducts(slug, limit ? +limit : 5);
+  }
+
   @Get(':slug')
   async findOne(@Param('slug') slug: string) {
     return this.productsService.findBySlug(slug);

@@ -469,6 +469,102 @@ export class ProductsService {
     return { message: 'Đã xóa sản phẩm thành công' };
   }
 
+  async getSimilarProducts(slug: string, limit = 5) {
+    const current = await this.productModel
+      .findOne({ slug, deletedAt: null })
+      .select('_id categoryId basePrice')
+      .lean();
+    if (!current) throw new NotFoundException('Không tìm thấy sản phẩm');
+
+    const results: any[] = [];
+    const excludeIds: any[] = [current._id];
+    const baseMatch: any = { deletedAt: null, status: 'active' };
+
+    const catLookup = [
+      {
+        $lookup: {
+          from: 'categories',
+          localField: 'categoryId',
+          foreignField: '_id',
+          as: 'categoryArr',
+        },
+      },
+      { $addFields: { categoryId: { $arrayElemAt: ['$categoryArr', 0] } } },
+      { $project: { categoryArr: 0 } },
+    ];
+
+    const buildPipeline = (matchExtra: object, n: number) => [
+      { $match: { ...baseMatch, _id: { $nin: excludeIds }, ...matchExtra } },
+      { $sample: { size: n } },
+      ...catLookup,
+    ];
+
+    const format = (p: any) => ({
+      id: p._id.toString(),
+      name: p.name,
+      slug: p.slug,
+      basePrice: p.basePrice,
+      images: p.images ?? [],
+      category: p.categoryId ? { name: p.categoryId.name } : undefined,
+    });
+
+    // Stage 1: cùng category con
+    if (current.categoryId && results.length < limit) {
+      const r = await this.productModel.aggregate(
+        buildPipeline({ categoryId: current.categoryId }, limit - results.length),
+      );
+      results.push(...r);
+      excludeIds.push(...r.map((p) => p._id));
+    }
+
+    // Stage 2: cùng category cha (anh/em)
+    if (results.length < limit && current.categoryId) {
+      const cat = await this.categoryModel
+        .findById(current.categoryId)
+        .select('parentId')
+        .lean();
+      if (cat?.parentId) {
+        const siblings = await this.categoryModel
+          .find({ parentId: cat.parentId, deletedAt: null })
+          .select('_id')
+          .lean();
+        const sibIds = siblings.map((s) => s._id);
+        const r = await this.productModel.aggregate(
+          buildPipeline({ categoryId: { $in: sibIds } }, limit - results.length),
+        );
+        results.push(...r);
+        excludeIds.push(...r.map((p) => p._id));
+      }
+    }
+
+    // Stage 3: giá ±100,000₫
+    if (results.length < limit) {
+      const r = await this.productModel.aggregate(
+        buildPipeline(
+          {
+            basePrice: {
+              $gte: current.basePrice - 100000,
+              $lte: current.basePrice + 100000,
+            },
+          },
+          limit - results.length,
+        ),
+      );
+      results.push(...r);
+      excludeIds.push(...r.map((p) => p._id));
+    }
+
+    // Stage 4: bất kỳ sản phẩm còn lại
+    if (results.length < limit) {
+      const r = await this.productModel.aggregate(
+        buildPipeline({}, limit - results.length),
+      );
+      results.push(...r);
+    }
+
+    return results.slice(0, limit).map(format);
+  }
+
   private toObjectId(id: string) {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException('ID không hợp lệ');
