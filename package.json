@@ -13,6 +13,7 @@
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
     "seed": "tsx src/database/seeders/seed.ts",
+    "migrate:paidAt": "tsx src/database/migrations/backfill-order-paid-at.ts",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",

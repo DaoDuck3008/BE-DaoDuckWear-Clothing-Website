@@ -18,6 +18,7 @@ import { InventoryModule } from './modules/inventory/inventory.module';
 import { BannersModule } from './modules/banners/banners.module';
 import { MailModule } from './modules/mail/mail.module';
 import { RedisModule } from './modules/redis/redis.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { RedisModule } from './modules/redis/redis.module';
     BannersModule,
     MailModule,
     HealthModule,
+    AnalyticsModule,
   ],
   controllers: [],
   providers: [],

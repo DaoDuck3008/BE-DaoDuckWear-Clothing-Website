@@ -367,7 +367,11 @@ export class OrdersService {
           );
         }
         order.status = status as OrderStatus;
-        order.paymentStatus = PaymentStatus.PAID;
+        // Nếu đơn hàng chưa thanh toán thì thanh toán
+        if (order.paymentStatus !== PaymentStatus.PAID) {
+          order.paymentStatus = PaymentStatus.PAID;
+          order.paidAt = new Date();
+        }
         await order.save({ session });
         await session.commitTransaction();
       } catch (error) {
