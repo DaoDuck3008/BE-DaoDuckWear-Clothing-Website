@@ -50,6 +50,47 @@ export class User {
   @Prop({ type: Boolean, default: false })
   isVerified!: boolean;
 
+  @Prop({ type: String, trim: true, default: null })
+  fullName?: string | null;
+
+  @Prop({ type: Date, default: null })
+  dateOfBirth?: Date | null;
+
+  @Prop({
+    type: String,
+    enum: ['male', 'female', 'other'],
+    default: null,
+  })
+  gender?: 'male' | 'female' | 'other' | null;
+
+  @Prop({ type: String, trim: true, default: null })
+  nationalId?: string | null;
+
+  @Prop({ type: String, trim: true, default: null })
+  phone?: string | null;
+
+  @Prop({ type: String, trim: true, default: null })
+  hometown?: string | null;
+
+  @Prop({ type: String, trim: true, default: null })
+  permanentAddress?: string | null;
+
+  @Prop({ type: String, trim: true, default: null })
+  currentAddress?: string | null;
+
+  @Prop({ type: Date, default: null })
+  hireDate?: Date | null;
+
+  @Prop({
+    type: String,
+    enum: ['active', 'onLeave', 'terminated'],
+    default: null,
+  })
+  employmentStatus?: 'active' | 'onLeave' | 'terminated' | null;
+
+  @Prop({ type: String, trim: true, default: null })
+  position?: string | null;
+
   @Prop({ type: Date, default: null })
   deletedAt?: Date | null;
 }
@@ -59,6 +100,8 @@ export const UserSchema = SchemaFactory.createForClass(User);
 UserSchema.index({ username: 1 }, { unique: true });
 UserSchema.index({ email: 1 }, { unique: true });
 UserSchema.index({ roleId: 1 });
+UserSchema.index({ shopId: 1 });
+UserSchema.index({ nationalId: 1 }, { sparse: true });
 UserSchema.pre('findOneAndDelete', async function (this: any) {
   const user = await this.model.findOne(this.getFilter()).lean();
   if (!user) return;

@@ -64,7 +64,9 @@ async function main() {
     },
   ];
 
-  await ShopModel.insertMany(shopsData);
+  const shops = await ShopModel.insertMany(shopsData);
+  const shopBySlug = new Map(shops.map((s) => [s.slug, s._id]));
+  const defaultShopId = shopBySlug.get('daoduck-hanoi');
 
   const roles = await RoleModel.insertMany(
     ['USER', 'STAFF', 'MANAGER', 'ADMIN'].map((name) => ({ name })),
@@ -73,9 +75,36 @@ async function main() {
 
   const passwordHash = await bcrypt.hash('123456', 10);
   const usersToCreate = [
-    { username: 'admin', email: 'admin@daoduck.com', role: 'ADMIN' },
-    { username: 'manager', email: 'manager@daoduck.com', role: 'MANAGER' },
-    { username: 'staff', email: 'staff@daoduck.com', role: 'STAFF' },
+    {
+      username: 'admin',
+      email: 'admin@daoduck.com',
+      role: 'ADMIN',
+      shopId: null,
+      fullName: 'Quản trị viên',
+      position: 'Quản trị hệ thống',
+      hireDate: new Date('2024-01-01'),
+      employmentStatus: 'active',
+    },
+    {
+      username: 'manager',
+      email: 'manager@daoduck.com',
+      role: 'MANAGER',
+      shopId: defaultShopId,
+      fullName: 'Nguyễn Văn Quản',
+      position: 'Quản lý chi nhánh',
+      hireDate: new Date('2024-02-01'),
+      employmentStatus: 'active',
+    },
+    {
+      username: 'staff',
+      email: 'staff@daoduck.com',
+      role: 'STAFF',
+      shopId: defaultShopId,
+      fullName: 'Trần Thị Nhân',
+      position: 'Nhân viên bán hàng',
+      hireDate: new Date('2024-03-15'),
+      employmentStatus: 'active',
+    },
   ];
 
   await UserModel.insertMany(
@@ -84,8 +113,13 @@ async function main() {
       email: user.email,
       password: passwordHash,
       roleId: roleMap.get(user.role),
+      shopId: user.shopId,
       addresses: [],
       isVerified: true,
+      fullName: user.fullName,
+      position: user.position,
+      hireDate: user.hireDate,
+      employmentStatus: user.employmentStatus,
     })),
   );
 
