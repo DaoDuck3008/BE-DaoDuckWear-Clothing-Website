@@ -17,8 +17,10 @@ import {
 } from '../orders/schemas/order.schema';
 import { Product, ProductDocument } from '../products/schemas/product.schema';
 import { User, UserDocument } from '../users/schemas/user.schema';
+import { RedisService } from '../redis/redis.service';
 
 const TZ = 'Asia/Ho_Chi_Minh';
+const ANALYTICS_TTL = 180; // 3 phút
 
 interface AnalyticsParams {
   shopId: string | null;
@@ -47,7 +49,19 @@ export class AnalyticsService {
     private readonly productModel: Model<ProductDocument>,
     @InjectModel(Category.name)
     private readonly categoryModel: Model<CategoryDocument>,
+    private readonly redis: RedisService,
   ) {}
+
+  private cacheKey(
+    method: string,
+    params: AnalyticsParams,
+    extra?: string,
+  ): string {
+    const shop = params.shopId ?? 'all';
+    const from = params.fromDate ?? '-';
+    const to = params.toDate ?? '-';
+    return `analytics:${shop}:${method}:${from}:${to}${extra ? `:${extra}` : ''}`;
+  }
 
   private resolveRange(params: AnalyticsParams): ResolvedRange {
     const { fromDate, toDate, shopId } = params;
@@ -125,6 +139,13 @@ export class AnalyticsService {
   }
 
   async getSummary(params: SummaryParams) {
+    const key = this.cacheKey('summary', params, params.role);
+    return this.redis.cacheable(key, ANALYTICS_TTL, () =>
+      this.getSummaryFromDb(params),
+    );
+  }
+
+  private async getSummaryFromDb(params: SummaryParams) {
     const range = this.resolveRange(params);
 
     const [aggResult] = await this.orderModel.aggregate([
@@ -169,6 +190,13 @@ export class AnalyticsService {
 
   // Lấy doanh thu theo ngày
   async getRevenueSeries(params: AnalyticsParams) {
+    const key = this.cacheKey('revenue-series', params);
+    return this.redis.cacheable(key, ANALYTICS_TTL, () =>
+      this.getRevenueSeriesFromDb(params),
+    );
+  }
+
+  private async getRevenueSeriesFromDb(params: AnalyticsParams) {
     const range = this.resolveRange(params);
 
     const rows: { _id: string; revenue: number; orders: number }[] =
@@ -215,7 +243,7 @@ export class AnalyticsService {
 
   // Format ngày tháng theo múi giờ Việt Nam
   private formatDateInTZ(d: Date): string {
-    // Build YYYY-MM-DD in Asia/Ho_Chi_Minh to align with $dateToString.
+    // Dựng YYYY-MM-DD theo múi giờ Việt Nam
     const parts = new Intl.DateTimeFormat('en-CA', {
       timeZone: TZ,
       year: 'numeric',
@@ -232,6 +260,13 @@ export class AnalyticsService {
   // dashboard. Đây là phân bố cấu trúc toàn bộ đơn của shop (giống recent
   // orders), không phải dữ liệu time-bound.
   async getOrdersByStatus(params: AnalyticsParams) {
+    const key = this.cacheKey('orders-by-status', params);
+    return this.redis.cacheable(key, ANALYTICS_TTL, () =>
+      this.getOrdersByStatusFromDb(params),
+    );
+  }
+
+  private async getOrdersByStatusFromDb(params: AnalyticsParams) {
     const { shopId } = params;
     const match: Record<string, any> = { deletedAt: null };
     if (shopId) {
@@ -260,6 +295,13 @@ export class AnalyticsService {
 
   // Lấy top sản phẩm theo doanh thu
   async getTopProducts(params: AnalyticsParams) {
+    const key = this.cacheKey('top-products', params);
+    return this.redis.cacheable(key, ANALYTICS_TTL, () =>
+      this.getTopProductsFromDb(params),
+    );
+  }
+
+  private async getTopProductsFromDb(params: AnalyticsParams) {
     const range = this.resolveRange(params);
 
     const stages: PipelineStage[] = [
@@ -300,6 +342,13 @@ export class AnalyticsService {
   // dashboard — đây là "luồng hoạt động mới nhất" của shop, không phải
   // tập đơn nằm trong khoảng đang xem.
   async getRecentOrders(params: AnalyticsParams) {
+    const key = this.cacheKey('recent-orders', params);
+    return this.redis.cacheable(key, ANALYTICS_TTL, () =>
+      this.getRecentOrdersFromDb(params),
+    );
+  }
+
+  private async getRecentOrdersFromDb(params: AnalyticsParams) {
     const { shopId } = params;
     const filter: Record<string, any> = { deletedAt: null };
     if (shopId) {
@@ -328,6 +377,13 @@ export class AnalyticsService {
   // - MANAGER/STAFF: chỉ count products có trong Inventory của shop đó.
   // Sau khi gom theo categoryId, lấy top 7 và gom phần còn lại thành "Khác".
   async getProductsByCategory(params: AnalyticsParams) {
+    const key = this.cacheKey('products-by-category', params);
+    return this.redis.cacheable(key, ANALYTICS_TTL, () =>
+      this.getProductsByCategoryFromDb(params),
+    );
+  }
+
+  private async getProductsByCategoryFromDb(params: AnalyticsParams) {
     const { shopId } = params;
     const TOP_N = 7;
 

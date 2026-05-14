@@ -34,6 +34,8 @@ async function bootstrap() {
   app.useGlobalInterceptors(new LoggingInterceptor()); // Bật LoggingInterceptor
   app.useGlobalFilters(new HttpExceptionFilter(configService)); // Bật HttpExceptionFilter
 
+  app.enableShutdownHooks(); // Cho phép onApplicationShutdown() chạy (Như đóng kết nối Redis)
+
   const port = configService.get<number>('PORT') ?? 5000;
   await app.listen(port);
   console.log(`Backend is running on: http://localhost:${port}`);

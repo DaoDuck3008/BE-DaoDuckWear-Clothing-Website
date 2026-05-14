@@ -14,6 +14,12 @@ import { ProductVariant } from './schemas/product-variant.schema';
 import { SlugGenerator } from '../../common/utils/slug.util';
 import { Inventory } from '../inventory/schemas/inventory.schema';
 import { Category } from '../categories/schemas/category.schema';
+import { RedisService } from '../redis/redis.service';
+
+const PRODUCT_SLUG_PREFIX = 'product:slug:';
+const PRODUCT_SIMILAR_PREFIX = 'product:similar:';
+const PRODUCT_SLUG_TTL = 300; // 5 phút — đủ ngắn để stock không quá lệch
+const PRODUCT_SIMILAR_TTL = 300; // 5 phút
 
 @Injectable()
 export class ProductsService {
@@ -24,7 +30,25 @@ export class ProductsService {
     @InjectModel(Inventory.name) private readonly inventoryModel: Model<any>,
     @InjectModel(Category.name) private readonly categoryModel: Model<any>,
     private readonly cloudinary: CloudinaryService,
+    private readonly redis: RedisService,
   ) {}
+
+  // Public: cho InventoryService gọi khi tồn kho thay đổi
+  async invalidateProductCacheByProductId(productId: string | Types.ObjectId) {
+    const product = await this.productModel
+      .findById(productId)
+      .select('slug')
+      .lean();
+    if (!product?.slug) return;
+    await this.invalidateProductCacheBySlug(product.slug);
+  }
+
+  private async invalidateProductCacheBySlug(slug: string) {
+    await Promise.all([
+      this.redis.del(`${PRODUCT_SLUG_PREFIX}${slug}`),
+      this.redis.delByPrefix(`${PRODUCT_SIMILAR_PREFIX}${slug}:`),
+    ]);
+  }
 
   async create(
     createProductDto: CreateProductDto,
@@ -264,6 +288,14 @@ export class ProductsService {
   }
 
   async findBySlug(slug: string) {
+    return this.redis.cacheable(
+      `${PRODUCT_SLUG_PREFIX}${slug}`,
+      PRODUCT_SLUG_TTL,
+      () => this.findBySlugFromDb(slug),
+    );
+  }
+
+  private async findBySlugFromDb(slug: string) {
     const product = await this.productModel
       .findOne({ slug, deletedAt: null })
       .populate('categoryId');
@@ -329,6 +361,8 @@ export class ProductsService {
       deleteImageIds, // Mảng ID ảnh cũ cần xóa
     } = updateProductDto;
 
+    const previousSlug = product.slug;
+
     // Cập nhật slug nếu tên thay đổi
     let slug = product.slug;
     if (name && name !== product.name) {
@@ -360,7 +394,7 @@ export class ProductsService {
 
     const session = await this.connection.startSession();
     try {
-      return await session.withTransaction(async () => {
+      const result = await session.withTransaction(async () => {
         // 3. Cập nhật thông tin Product
         await this.productModel.findByIdAndUpdate(
           id,
@@ -450,6 +484,14 @@ export class ProductsService {
 
         return { success: true, slug };
       });
+
+      // Invalidate cache cả slug cũ lẫn slug mới (trường hợp đổi tên)
+      await this.invalidateProductCacheBySlug(previousSlug);
+      if (slug !== previousSlug) {
+        await this.invalidateProductCacheBySlug(slug);
+      }
+
+      return result;
     } finally {
       await session.endSession();
     }
@@ -466,10 +508,19 @@ export class ProductsService {
       { deletedAt: new Date() }, // SOFT DELETE cho variant
     );
 
+    await this.invalidateProductCacheBySlug(product.slug);
     return { message: 'Đã xóa sản phẩm thành công' };
   }
 
   async getSimilarProducts(slug: string, limit = 5) {
+    return this.redis.cacheable(
+      `${PRODUCT_SIMILAR_PREFIX}${slug}:${limit}`,
+      PRODUCT_SIMILAR_TTL,
+      () => this.getSimilarProductsFromDb(slug, limit),
+    );
+  }
+
+  private async getSimilarProductsFromDb(slug: string, limit: number) {
     const current = await this.productModel
       .findOne({ slug, deletedAt: null })
       .select('_id categoryId basePrice')

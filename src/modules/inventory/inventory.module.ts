@@ -8,6 +8,7 @@ import {
   ProductVariant,
   ProductVariantSchema,
 } from '../products/schemas/product-variant.schema';
+import { ProductsModule } from '../products/products.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import {
       { name: Product.name, schema: ProductSchema },
       { name: ProductVariant.name, schema: ProductVariantSchema },
     ]),
+    ProductsModule,
   ],
   controllers: [InventoryController],
   providers: [InventoryService],

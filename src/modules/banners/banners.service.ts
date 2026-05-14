@@ -9,6 +9,10 @@ import { Banner, BannerDocument } from './schemas/banner.schema';
 import { CreateBannerDto } from './dto/create-banner.dto';
 import { UpdateBannerDto } from './dto/update-banner.dto';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import { RedisService } from '../redis/redis.service';
+
+const BANNERS_PREFIX = 'banners:';
+const BANNERS_TTL = 600; // 10 phút
 
 @Injectable()
 export class BannersService {
@@ -16,6 +20,7 @@ export class BannersService {
     @InjectModel(Banner.name)
     private readonly bannerModel: Model<BannerDocument>,
     private readonly cloudinaryService: CloudinaryService,
+    private readonly redis: RedisService,
   ) {}
 
   async findAll(query: {
@@ -29,10 +34,22 @@ export class BannersService {
     if (query.position) filter.position = query.position;
     if (query.isActive !== undefined) filter.isActive = query.isActive;
 
-    return this.bannerModel
-      .find(filter)
-      .sort({ sortOrder: 1, createdAt: -1 })
-      .lean();
+    const loader = () =>
+      this.bannerModel
+        .find(filter)
+        .sort({ sortOrder: 1, createdAt: -1 })
+        .lean();
+
+    // Chỉ cache request storefront (isActive=true). Admin gọi với
+    // isActive=undefined hoặc false → đi thẳng DB để luôn thấy data mới nhất.
+    if (query.isActive !== true) return loader();
+
+    const key = `${BANNERS_PREFIX}${query.page ?? '_'}:${query.position ?? '_'}:active`;
+    return this.redis.cacheable(key, BANNERS_TTL, loader);
+  }
+
+  private async invalidateBannersCache() {
+    await this.redis.delByPrefix(BANNERS_PREFIX);
   }
 
   async findOne(id: string) {
@@ -77,6 +94,7 @@ export class BannersService {
       mobilePublicId,
     });
 
+    await this.invalidateBannersCache();
     return banner.toJSON();
   }
 
@@ -115,22 +133,27 @@ export class BannersService {
       updateData.mobilePublicId = publicId;
     }
 
-    return this.bannerModel
+    const updated = await this.bannerModel
       .findByIdAndUpdate(id, updateData, { new: true })
       .lean();
+    await this.invalidateBannersCache();
+    return updated;
   }
 
   async remove(id: string) {
     const banner = await this.bannerModel.findOne({ _id: id, deletedAt: null });
     if (!banner) throw new NotFoundException('Không tìm thấy banner');
     await this.bannerModel.findByIdAndUpdate(id, { deletedAt: new Date() });
+    await this.invalidateBannersCache();
   }
 
   async toggleStatus(id: string) {
     const banner = await this.bannerModel.findOne({ _id: id, deletedAt: null });
     if (!banner) throw new NotFoundException('Không tìm thấy banner');
-    return this.bannerModel
+    const updated = await this.bannerModel
       .findByIdAndUpdate(id, { isActive: !banner.isActive }, { new: true })
       .lean();
+    await this.invalidateBannersCache();
+    return updated;
   }
 }

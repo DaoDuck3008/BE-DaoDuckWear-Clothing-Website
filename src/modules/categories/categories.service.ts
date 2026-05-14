@@ -11,6 +11,10 @@ import { SlugGenerator } from '../../common/utils/slug.util';
 import { BusinessException } from '../../common/exceptions/business.exception';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
+import { RedisService } from '../redis/redis.service';
+
+const CATS_TREE_KEY = 'cats:tree';
+const CATS_TREE_TTL = 3600; // 1 giờ
 
 @Injectable()
 export class CategoriesService {
@@ -19,14 +23,17 @@ export class CategoriesService {
     private readonly categoryModel: Model<CategoryDocument>,
     @InjectModel(Product.name)
     private readonly productModel: Model<any>,
+    private readonly redis: RedisService,
   ) {}
 
   async findAllTree() {
-    const categories = await this.categoryModel
-      .find({ deletedAt: null })
-      .sort({ name: 1 });
+    return this.redis.cacheable(CATS_TREE_KEY, CATS_TREE_TTL, async () => {
+      const categories = await this.categoryModel
+        .find({ deletedAt: null })
+        .sort({ name: 1 });
 
-    return this.buildTree(categories.map((c) => c.toJSON()));
+      return this.buildTree(categories.map((c) => c.toJSON()));
+    });
   }
 
   async findAllAdmin() {
@@ -78,6 +85,7 @@ export class CategoriesService {
       parentId: parentId ? new Types.ObjectId(parentId) : null,
     });
 
+    await this.redis.del(CATS_TREE_KEY);
     return { id: category._id, name: category.name, slug: category.slug };
   }
 
@@ -110,6 +118,7 @@ export class CategoriesService {
     }
 
     await this.categoryModel.findByIdAndUpdate(id, { $set: updateData });
+    await this.redis.del(CATS_TREE_KEY);
     return { message: 'Cập nhật danh mục thành công' };
   }
 
@@ -140,6 +149,7 @@ export class CategoriesService {
       $set: { deletedAt: new Date() },
     });
 
+    await this.redis.del(CATS_TREE_KEY);
     return { message: 'Xóa danh mục thành công' };
   }
 

@@ -8,6 +8,7 @@ import { Model, Types } from 'mongoose';
 import { Inventory } from './schemas/inventory.schema';
 import { Product } from '../products/schemas/product.schema';
 import { ProductVariant } from '../products/schemas/product-variant.schema';
+import { ProductsService } from '../products/products.service';
 
 @Injectable()
 export class InventoryService {
@@ -18,6 +19,7 @@ export class InventoryService {
     private readonly productModel: Model<any>,
     @InjectModel(ProductVariant.name)
     private readonly variantModel: Model<any>,
+    private readonly productsService: ProductsService,
   ) {}
 
    async findAllInventoryAdmin(query: {
@@ -167,6 +169,9 @@ export class InventoryService {
       existingInventory.quantity = quantity;
       await existingInventory.save();
     }
+
+    // Tồn kho đã đổi → invalidate cache chi tiết sản phẩm tương ứng
+    await this.productsService.invalidateProductCacheByProductId(productId);
 
     return { success: true };
   }
