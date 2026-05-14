@@ -129,6 +129,12 @@ export class AuthService {
       };
     }
 
+    if (user.isLocked) {
+      throw new UnauthorizedException(
+        'Tài khoản của bạn đã bị tạm khóa. Vui lòng liên hệ quản trị viên',
+      );
+    }
+
     const role = user.roleId as any;
     if (!role) {
       throw new UnauthorizedException('Tài khoản chưa được gán vai trò');
@@ -255,6 +261,12 @@ export class AuthService {
       throw new UnauthorizedException('Không tìm thấy tài khoản');
     }
 
+    if (user.isLocked) {
+      throw new UnauthorizedException(
+        'Tài khoản của bạn đã bị tạm khóa. Vui lòng liên hệ quản trị viên',
+      );
+    }
+
     const role = user.roleId as any;
     if (!role) {
       throw new UnauthorizedException('Tài khoản chưa được gán vai trò');
@@ -324,6 +336,12 @@ export class AuthService {
           .populate('shopId', 'name _id');
       }
 
+      if (user.isLocked) {
+        throw new UnauthorizedException(
+          'Tài khoản của bạn đã bị tạm khóa. Vui lòng liên hệ quản trị viên',
+        );
+      }
+
       const role = user.roleId as any;
       if (!role) {
         throw new UnauthorizedException('Tài khoản chưa được gán vai trò');
@@ -345,6 +363,9 @@ export class AuthService {
         refreshToken,
       };
     } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
       console.error('Google Auth Error:', error);
       throw new UnauthorizedException('Xác thực Google thất bại');
     }

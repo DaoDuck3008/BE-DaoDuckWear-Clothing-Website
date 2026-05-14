@@ -50,6 +50,9 @@ export class User {
   @Prop({ type: Boolean, default: false })
   isVerified!: boolean;
 
+  @Prop({ type: Boolean, default: false, index: true })
+  isLocked!: boolean;
+
   @Prop({ type: String, trim: true, default: null })
   fullName?: string | null;
 

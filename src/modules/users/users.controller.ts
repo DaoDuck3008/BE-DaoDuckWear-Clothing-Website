@@ -19,6 +19,10 @@ import {
   ListStaffQueryDto,
   UpdateStaffDto,
 } from './dto/staff.dto';
+import {
+  ListCustomerOrdersQueryDto,
+  ListCustomerQueryDto,
+} from './dto/customer.dto';
 
 interface AuthUserPayload {
   id: string;
@@ -96,5 +100,49 @@ export class UsersController {
     @CurrentUser() user: AuthUserPayload,
   ) {
     return this.usersService.resetStaffPassword(id, user);
+  }
+
+  // ======================== CUSTOMER ROUTES ========================
+
+  @Get('customers')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async findCustomers(@Query() query: ListCustomerQueryDto) {
+    return this.usersService.findAllCustomers(query);
+  }
+
+  @Get('customers/:id')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async findCustomerById(@Param('id') id: string) {
+    return this.usersService.findCustomerById(id);
+  }
+
+  @Get('customers/:id/orders')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async findCustomerOrders(
+    @Param('id') id: string,
+    @Query() query: ListCustomerOrdersQueryDto,
+  ) {
+    return this.usersService.findCustomerOrders(
+      id,
+      query.page ?? 1,
+      query.limit ?? 5,
+    );
+  }
+
+  @Patch('customers/:id/lock')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async lockCustomer(@Param('id') id: string) {
+    return this.usersService.setCustomerLock(id, true);
+  }
+
+  @Patch('customers/:id/unlock')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async unlockCustomer(@Param('id') id: string) {
+    return this.usersService.setCustomerLock(id, false);
   }
 }

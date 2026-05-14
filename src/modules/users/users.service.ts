@@ -10,6 +10,7 @@ import { Model, Types } from 'mongoose';
 import { randomBytes } from 'crypto';
 import { User, UserDocument } from './schemas/user.schema';
 import { Role, RoleDocument } from '../roles/schemas/role.schema';
+import { Order, OrderDocument } from '../orders/schemas/order.schema';
 import { MailService } from '../mail/mail.service';
 import { hashPassword } from '../../common/utils/password.util';
 import {
@@ -19,6 +20,7 @@ import {
   StaffRoleName,
   UpdateStaffDto,
 } from './dto/staff.dto';
+import { ListCustomerQueryDto } from './dto/customer.dto';
 
 interface AuthUser {
   id: string;
@@ -43,6 +45,7 @@ export class UsersService {
   constructor(
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
     @InjectModel(Role.name) private readonly roleModel: Model<RoleDocument>,
+    @InjectModel(Order.name) private readonly orderModel: Model<OrderDocument>,
     private readonly mailService: MailService,
   ) {}
 
@@ -472,5 +475,186 @@ export class UsersService {
       });
 
     return { success: true };
+  }
+
+  // ======================== CUSTOMER METHODS ========================
+
+  private async getCustomerRoleId(): Promise<Types.ObjectId> {
+    const role = await this.roleModel.findOne({ name: 'USER' }).lean();
+    if (!role) {
+      throw new NotFoundException('Không tìm thấy vai trò USER');
+    }
+    return role._id;
+  }
+
+  private serializeCustomer(user: any) {
+    return {
+      id: user._id?.toString?.() ?? user.id,
+      username: user.username,
+      email: user.email,
+      avatar: user.avatar ?? null,
+      provider: user.provider,
+      isVerified: !!user.isVerified,
+      isLocked: !!user.isLocked,
+      addresses: (user.addresses ?? [])
+        .filter((a: any) => !a.deletedAt)
+        .map((a: any) => ({
+          id: a._id?.toString?.() ?? '',
+          address: a.address,
+          phone: a.phone ?? null,
+        })),
+      createdAt: user.createdAt,
+    };
+  }
+
+  async findAllCustomers(query: ListCustomerQueryDto) {
+    const userRoleId = await this.getCustomerRoleId();
+
+    const page = Math.max(1, query.page ?? 1);
+    const limit = Math.min(100, Math.max(1, query.limit ?? 10));
+
+    const filter: Record<string, any> = {
+      deletedAt: null,
+      roleId: userRoleId,
+    };
+
+    if (query.provider) {
+      filter.provider = query.provider;
+    }
+    if (query.isVerified === '1' || query.isVerified === '0') {
+      filter.isVerified = query.isVerified === '1';
+    }
+    if (query.isLocked === '1' || query.isLocked === '0') {
+      filter.isLocked = query.isLocked === '1';
+    }
+
+    if (query.search?.trim()) {
+      const q = query.search.trim();
+      const regex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      filter.$or = [
+        { username: regex },
+        { email: regex },
+        { 'addresses.phone': regex },
+      ];
+    }
+
+    const [items, total] = await Promise.all([
+      this.userModel
+        .find(filter)
+        .select(
+          'username email avatar provider isVerified isLocked addresses createdAt',
+        )
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      this.userModel.countDocuments(filter),
+    ]);
+
+    return {
+      data: items.map((u) => this.serializeCustomer(u)),
+      total,
+      page,
+      limit,
+    };
+  }
+
+  async findCustomerById(id: string) {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('Mã khách hàng không hợp lệ');
+    }
+
+    const userRoleId = await this.getCustomerRoleId();
+    const user = await this.userModel
+      .findOne({ _id: id, roleId: userRoleId, deletedAt: null })
+      .select(
+        'username email avatar provider isVerified isLocked addresses createdAt',
+      )
+      .lean();
+
+    if (!user) {
+      throw new NotFoundException('Không tìm thấy khách hàng');
+    }
+
+    return this.serializeCustomer(user);
+  }
+
+  async findCustomerOrders(
+    id: string,
+    page = 1,
+    limit = 5,
+  ) {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('Mã khách hàng không hợp lệ');
+    }
+
+    // Đảm bảo user tồn tại & là khách hàng
+    const userRoleId = await this.getCustomerRoleId();
+    const exists = await this.userModel
+      .exists({ _id: id, roleId: userRoleId, deletedAt: null });
+    if (!exists) {
+      throw new NotFoundException('Không tìm thấy khách hàng');
+    }
+
+    const safePage = Math.max(1, page);
+    const safeLimit = Math.min(50, Math.max(1, limit));
+
+    const filter = {
+      userId: new Types.ObjectId(id),
+      deletedAt: null,
+    };
+
+    const [items, total] = await Promise.all([
+      this.orderModel
+        .find(filter)
+        .select(
+          'orderCode finalTotal status paymentStatus paymentMethod createdAt items',
+        )
+        .sort({ createdAt: -1 })
+        .skip((safePage - 1) * safeLimit)
+        .limit(safeLimit)
+        .lean(),
+      this.orderModel.countDocuments(filter),
+    ]);
+
+    return {
+      data: items.map((o: any) => ({
+        id: o._id.toString(),
+        orderCode: o.orderCode,
+        finalTotal: o.finalTotal,
+        status: o.status,
+        paymentStatus: o.paymentStatus,
+        paymentMethod: o.paymentMethod,
+        createdAt: o.createdAt,
+        itemCount: Array.isArray(o.items) ? o.items.length : 0,
+      })),
+      total,
+      page: safePage,
+      limit: safeLimit,
+    };
+  }
+
+  async setCustomerLock(id: string, locked: boolean) {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('Mã khách hàng không hợp lệ');
+    }
+
+    const userRoleId = await this.getCustomerRoleId();
+    const updated = await this.userModel
+      .findOneAndUpdate(
+        { _id: id, roleId: userRoleId, deletedAt: null },
+        { $set: { isLocked: locked } },
+        { new: true },
+      )
+      .select(
+        'username email avatar provider isVerified isLocked addresses createdAt',
+      )
+      .lean();
+
+    if (!updated) {
+      throw new NotFoundException('Không tìm thấy khách hàng');
+    }
+
+    return this.serializeCustomer(updated);
   }
 }
