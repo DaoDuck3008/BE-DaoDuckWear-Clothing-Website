@@ -19,6 +19,7 @@ import { BannersModule } from './modules/banners/banners.module';
 import { MailModule } from './modules/mail/mail.module';
 import { RedisModule } from './modules/redis/redis.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { ReviewsModule } from './modules/reviews/reviews.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
     MailModule,
     HealthModule,
     AnalyticsModule,
+    ReviewsModule,
   ],
   controllers: [],
   providers: [],
