@@ -99,7 +99,7 @@ export class AnalyticsService {
   // backfill paidAt = updatedAt cho các đơn có paymentStatus = PAID.
   private baseMatch(
     range: ResolvedRange,
-    opts?: { dateField?: 'createdAt' | 'paidAt' },
+    opts?: { dateField?: 'createdAt' | 'paidAt' | 'updatedAt' },
   ): PipelineStage.Match {
     const dateField = opts?.dateField ?? 'createdAt';
     const match: Record<string, any> = {
@@ -108,6 +108,8 @@ export class AnalyticsService {
     if (dateField === 'paidAt') {
       match.paymentStatus = PaymentStatus.PAID;
       match.paidAt = { $gte: range.from, $lte: range.to };
+    } else if (dateField === 'updatedAt') {
+      match.updatedAt = { $gte: range.from, $lte: range.to };
     } else {
       match.createdAt = { $gte: range.from, $lte: range.to };
     }
@@ -256,9 +258,11 @@ export class AnalyticsService {
     return `${y}-${m}-${day}`;
   }
 
-  // Số lượng đơn hàng theo trạng thái — không filter theo date range của
-  // dashboard. Đây là phân bố cấu trúc toàn bộ đơn của shop (giống recent
-  // orders), không phải dữ liệu time-bound.
+  // Số lượng đơn hàng theo trạng thái trong khoảng thời gian đã chọn.
+  // Lọc theo `updatedAt` để bắt mọi hoạt động chuyển trạng thái trong range:
+  // đơn đặt hôm qua nhưng confirm/cancel hôm nay vẫn được tính vào hôm nay.
+  // Không dùng `createdAt` (bỏ sót đơn cũ vừa đổi trạng thái) hay `paidAt`
+  // (bỏ sót PENDING/CANCELLED vì các đơn này không có paidAt).
   async getOrdersByStatus(params: AnalyticsParams) {
     const key = this.cacheKey('orders-by-status', params);
     return this.redis.cacheable(key, ANALYTICS_TTL, () =>
@@ -267,15 +271,11 @@ export class AnalyticsService {
   }
 
   private async getOrdersByStatusFromDb(params: AnalyticsParams) {
-    const { shopId } = params;
-    const match: Record<string, any> = { deletedAt: null };
-    if (shopId) {
-      match['items.shopId'] = new Types.ObjectId(shopId);
-    }
+    const range = this.resolveRange(params);
 
     const rows: { _id: OrderStatus; count: number }[] =
       await this.orderModel.aggregate([
-        { $match: match },
+        this.baseMatch(range, { dateField: 'updatedAt' }),
         { $group: { _id: '$status', count: { $sum: 1 } } },
       ]);
 
