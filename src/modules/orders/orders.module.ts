@@ -15,9 +15,11 @@ import {
 import { Cart, CartSchema } from '../cart/schemas/cart.schema';
 import { CartService } from '../cart/cart.service';
 import { Shop, ShopSchema } from '../shops/schemas/shop.schema';
+import { MailModule } from '../mail/mail.module';
 
 @Module({
   imports: [
+    MailModule,
     MongooseModule.forFeature([
       { name: Order.name, schema: OrderSchema },
       { name: Product.name, schema: ProductSchema },

@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { getVerifyEmailHtml } from './templates/verifyEmail';
 import { getResetPasswordHtml } from './templates/resetPassword';
 import { getStaffCredentialsHtml } from './templates/staffWelcome';
+import { getOrderCompletedHtml } from './templates/orderCompleted';
 
 @Injectable()
 export class MailService {
@@ -36,6 +37,29 @@ export class MailService {
         loginUrl,
         isReset: false,
       }),
+    });
+  }
+
+  async sendOrderCompletedEmail(params: {
+    to: string;
+    username: string;
+    orderId: string;
+    orderCode: string;
+    items: Array<{
+      name: string;
+      image?: string;
+      price: number;
+      quantity: number;
+      color: string;
+      size: string;
+    }>;
+    finalTotal: number;
+  }) {
+    const reviewUrl = `${process.env.FRONTEND_URL ?? ''}/profile/orders/${params.orderId}/review`;
+    await this.mailerService.sendMail({
+      to: params.to,
+      subject: `Đơn hàng #${params.orderCode} đã hoàn thành — DaoDuck Wear`,
+      html: getOrderCompletedHtml({ ...params, reviewUrl }),
     });
   }
 

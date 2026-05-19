@@ -32,6 +32,12 @@ export class ReviewsController {
     return this.reviewsService.getProductRatingStats(productId);
   }
 
+  @Get('my-review')
+  @UseGuards(AuthGuard)
+  getMyReview(@Query('productId') productId: string, @CurrentUser() user: any) {
+    return this.reviewsService.getMyReview(user.id, productId);
+  }
+
   @Post()
   @UseGuards(AuthGuard)
   createReview(@Body() dto: CreateReviewDto, @CurrentUser() user: any) {

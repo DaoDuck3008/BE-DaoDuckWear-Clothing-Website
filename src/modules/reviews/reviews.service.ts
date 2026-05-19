@@ -133,6 +133,18 @@ export class ReviewsService {
     return (await review.populate('userId', 'username avatar')).toObject();
   }
 
+  async getMyReview(userId: string, productId: string) {
+    return (
+      (await this.reviewModel
+        .findOne({
+          userId: new Types.ObjectId(userId),
+          productId: new Types.ObjectId(productId),
+          deletedAt: null,
+        })
+        .lean()) ?? null
+    );
+  }
+
   async deleteReview(userId: string, reviewId: string) {
     const review = await this.reviewModel.findOne({
       _id: new Types.ObjectId(reviewId),

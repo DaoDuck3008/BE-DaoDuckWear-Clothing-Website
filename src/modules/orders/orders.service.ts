@@ -26,6 +26,7 @@ import { generateUniqueHex } from 'src/common/utils/crypto.util';
 import { formatDateCode } from 'src/common/utils/date.util';
 
 import { CartService } from '../cart/cart.service';
+import { MailService } from '../mail/mail.service';
 
 @Injectable()
 export class OrdersService {
@@ -38,6 +39,7 @@ export class OrdersService {
     private inventoryModel: Model<InventoryDocument>,
     @InjectConnection() private readonly connection: Connection,
     private readonly cartService: CartService,
+    private readonly mailService: MailService,
   ) {}
 
   async createOrder(createOrderDto: CreateOrderDto, userId: string) {
@@ -374,6 +376,45 @@ export class OrdersService {
         }
         await order.save({ session });
         await session.commitTransaction();
+
+        // Fire-and-forget: gửi email cảm ơn + lời mời đánh giá
+        // Lưu userId trước khi session đóng để dùng trong IIFE
+        const orderUserId = order.userId?.toString();
+        const orderId = order._id.toString();
+        const orderCode = order.orderCode;
+        const orderItems = order.items.map((item) => ({
+          name: item.name,
+          image: item.image,
+          price: item.price,
+          quantity: item.quantity,
+          color: item.color,
+          size: item.size,
+        }));
+        const orderFinalTotal = order.finalTotal;
+
+        (async () => {
+          try {
+            if (!orderUserId) return;
+            // Query mới, không dùng session đã đóng
+            const userDoc = await this.orderModel.db
+              .collection('users')
+              .findOne(
+                { _id: new Types.ObjectId(orderUserId) },
+                { projection: { email: 1, username: 1 } },
+              );
+            if (!userDoc?.email) return;
+            await this.mailService.sendOrderCompletedEmail({
+              to: userDoc.email,
+              username: userDoc.username ?? 'bạn',
+              orderId,
+              orderCode,
+              items: orderItems,
+              finalTotal: orderFinalTotal,
+            });
+          } catch (err) {
+            console.error('[OrderCompleted] Gửi email thất bại:', err);
+          }
+        })();
       } catch (error) {
         await session.abortTransaction();
         throw error;
