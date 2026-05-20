@@ -5,13 +5,24 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ValidationPipe } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
+import helmet from 'helmet';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
+  const isProd = configService.get<string>('NODE_ENV') === 'production';
 
   // MIDDLEWARE
   app.use(cookieParser());
+  app.use(
+    helmet({
+      contentSecurityPolicy: false, // CSP được config ở frontend (next.config.ts)
+      crossOriginResourcePolicy: { policy: 'cross-origin' }, // Cho phép browser load ảnh Cloudinary
+      strictTransportSecurity: isProd
+        ? { maxAge: 31536000, includeSubDomains: true }
+        : false,
+    }),
+  );
 
   // Bật CORS
   app.enableCors({
