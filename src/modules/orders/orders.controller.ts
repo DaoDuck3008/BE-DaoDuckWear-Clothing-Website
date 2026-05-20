@@ -10,6 +10,7 @@ import {
   Patch,
   BadRequestException,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { OrdersService } from './orders.service';
 import { AuthGuard } from 'src/common/guards/auth.guard';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -23,6 +24,7 @@ export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
   @Post()
+  @Throttle({ global: { ttl: 60_000, limit: 10 } })
   @UseGuards(AuthGuard)
   async create(
     @Body() createOrderDto: CreateOrderDto,

@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { MongooseModule } from '@nestjs/mongoose';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
+import { createThrottlerOptions } from './config/rateLimit.config';
 import { HealthModule } from './modules/health/health.module';
 import { UsersModule } from './modules/users/users.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -26,6 +28,7 @@ import { ReviewsModule } from './modules/reviews/reviews.module';
     ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
     DatabaseModule,
     RedisModule,
+    ThrottlerModule.forRoot(createThrottlerOptions()),
     RolesModule,
     AuthModule,
     UsersModule,
@@ -45,6 +48,6 @@ import { ReviewsModule } from './modules/reviews/reviews.module';
     ReviewsModule,
   ],
   controllers: [],
-  providers: [],
+  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}

@@ -264,17 +264,17 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token không hợp lệ hoặc đã hết hạn');
     }
 
-    const { id, tokenId } = decoded;
+    const { id:userId, tokenId } = decoded;
 
     const stored = await this.redisService.get(`refresh_token:${tokenId}`);
-    if (!stored || stored !== id) {
+    if (!stored || stored !== userId) {
       throw new UnauthorizedException('Refresh token đã bị thu hồi');
     }
 
     await this.redisService.del(`refresh_token:${tokenId}`);
 
     const user = await this.userModel
-      .findById(id)
+      .findById(userId)
       .populate('roleId', 'name _id')
       .populate('shopId', 'name _id');
 

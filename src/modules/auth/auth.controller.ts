@@ -12,6 +12,7 @@ import {
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthService } from './auth.service';
 import {
@@ -35,6 +36,7 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
+  @Throttle({ global: { ttl: 60_000, limit: 3 } })
   async register(@Body() body: RegisterDto) {
     const { user, requiresVerification } =
       await this.authService.register(body);
@@ -54,26 +56,31 @@ export class AuthController {
   }
 
   @Post('forgot-password')
+  @Throttle({ global: { ttl: 60_000, limit: 3 } })
   async forgotPassword(@Body() dto: ForgotPasswordDto) {
     return this.authService.forgotPassword(dto.email);
   }
 
   @Post('reset-password')
+  @Throttle({ global: { ttl: 60_000, limit: 5 } })
   async resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto.email, dto.code, dto.newPassword);
   }
 
   @Post('verify-email')
+  @Throttle({ global: { ttl: 60_000, limit: 5 } })
   async verifyEmail(@Body() dto: VerifyEmailDto) {
     return this.authService.verifyEmail(dto.email, dto.code);
   }
 
   @Post('resend-verify-email')
+  @Throttle({ global: { ttl: 60_000, limit: 3 } })
   async resendVerifyEmail(@Body() dto: ResendVerifyEmailDto) {
     return this.authService.resendVerifyEmail(dto.email);
   }
 
   @Post('login')
+  @Throttle({ global: { ttl: 60_000, limit: 5 } })
   async login(
     @Body() body: LoginDto,
     @Res({ passthrough: true }) res: Response,
@@ -119,6 +126,7 @@ export class AuthController {
   }
 
   @Post('google')
+  @Throttle({ global: { ttl: 60_000, limit: 5 } })
   async googleLogin(
     @Body('credential') credential: string,
     @Res({ passthrough: true }) res: Response,
@@ -172,12 +180,14 @@ export class AuthController {
   }
 
   @Patch('change-password')
+  @Throttle({ global: { ttl: 60_000, limit: 5 } })
   @UseGuards(AuthGuard)
   async changePassword(@CurrentUser() user: any, @Body() dto: ChangePasswordDto) {
     return this.authService.changePassword(user.id, dto);
   }
 
   @Post('profile/avatar')
+  @Throttle({ global: { ttl: 60_000, limit: 10 } })
   @UseGuards(AuthGuard)
   @UseInterceptors(FileInterceptor('avatar'))
   async uploadAvatar(
@@ -205,6 +215,7 @@ export class AuthController {
   }
 
   @Post('refresh')
+  @Throttle({ global: { ttl: 60_000, limit: 20 } })
   async refresh(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
