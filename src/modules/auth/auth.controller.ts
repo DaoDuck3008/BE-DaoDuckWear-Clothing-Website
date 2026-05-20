@@ -190,7 +190,9 @@ export class AuthController {
 
   @Post('logout')
   @UseGuards(AuthGuard)
-  async logout(@Res({ passthrough: true }) res: Response) {
+  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const token = req.cookies?.refreshToken;
+    if (token) await this.authService.logout(token);
     res.clearCookie('refreshToken', {
       httpOnly: true,
       secure: true,
@@ -198,7 +200,7 @@ export class AuthController {
     });
     return {
       success: true,
-      message: 'User logged out successfully',
+      message: 'Đăng xuất thành công',
     };
   }
 

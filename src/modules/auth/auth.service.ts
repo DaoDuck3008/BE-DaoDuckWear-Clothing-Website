@@ -29,6 +29,7 @@ import { Role } from '../roles/schemas/role.schema';
 import { OAuth2Client } from 'google-auth-library';
 
 const VERIFY_TTL = 600; // 10 phút
+const REFRESH_TOKEN_TTL = 7 * 24 * 60 * 60; // 7 ngày
 
 const generateOtp = () =>
   Math.floor(100000 + Math.random() * 900000).toString();
@@ -145,7 +146,12 @@ export class AuthService {
       role: role.name,
       shopId: user.shopId?.id || null,
     });
-    const refreshToken = signRefreshToken({ id: user.id });
+    const { token: refreshToken, tokenId } = signRefreshToken({ id: user.id });
+    await this.redisService.set(
+      `refresh_token:${tokenId}`,
+      user.id,
+      REFRESH_TOKEN_TTL,
+    );
 
     return {
       user: {
@@ -251,9 +257,24 @@ export class AuthService {
   }
 
   async refresh(refreshToken: string) {
-    const decodedToken = verifyRefreshToken(refreshToken);
+    let decoded: { id: string; tokenId: string };
+    try {
+      decoded = verifyRefreshToken(refreshToken);
+    } catch {
+      throw new UnauthorizedException('Refresh token không hợp lệ hoặc đã hết hạn');
+    }
+
+    const { id, tokenId } = decoded;
+
+    const stored = await this.redisService.get(`refresh_token:${tokenId}`);
+    if (!stored || stored !== id) {
+      throw new UnauthorizedException('Refresh token đã bị thu hồi');
+    }
+
+    await this.redisService.del(`refresh_token:${tokenId}`);
+
     const user = await this.userModel
-      .findById(decodedToken.id)
+      .findById(id)
       .populate('roleId', 'name _id')
       .populate('shopId', 'name _id');
 
@@ -277,7 +298,12 @@ export class AuthService {
       role: role.name,
       shopId: user.shopId?.id || null,
     });
-    const newRefreshToken = signRefreshToken({ id: user.id });
+    const { token: newRefreshToken, tokenId: newTokenId } = signRefreshToken({ id: user.id });
+    await this.redisService.set(
+      `refresh_token:${newTokenId}`,
+      user.id,
+      REFRESH_TOKEN_TTL,
+    );
 
     return {
       user: {
@@ -287,6 +313,15 @@ export class AuthService {
       accessToken,
       refreshToken: newRefreshToken,
     };
+  }
+
+  async logout(refreshToken: string) {
+    try {
+      const { tokenId } = verifyRefreshToken(refreshToken);
+      await this.redisService.del(`refresh_token:${tokenId}`);
+    } catch {
+      // Token đã hết hạn hoặc không hợp lệ — không cần revoke
+    }
   }
 
   async googleLogin(credential: string) {
@@ -352,7 +387,12 @@ export class AuthService {
         role: role.name,
         shopId: user.shopId?.id || null,
       });
-      const refreshToken = signRefreshToken({ id: user.id });
+      const { token: refreshToken, tokenId } = signRefreshToken({ id: user.id });
+      await this.redisService.set(
+        `refresh_token:${tokenId}`,
+        user.id,
+        REFRESH_TOKEN_TTL,
+      );
 
       return {
         user: {
