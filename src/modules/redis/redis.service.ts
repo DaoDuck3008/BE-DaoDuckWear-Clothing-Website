@@ -4,6 +4,7 @@ import {
   Logger,
   OnApplicationBootstrap,
   OnApplicationShutdown,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import Redis from 'ioredis';
 
@@ -46,15 +47,30 @@ export class RedisService
   }
 
   async set(key: string, value: string, ttlSeconds: number): Promise<void> {
-    await this.client.set(key, value, 'EX', ttlSeconds);
+    try {
+      await this.client.set(key, value, 'EX', ttlSeconds);
+    } catch (err) {
+      this.logger.error(`[Redis] set failed for "${key}": ${(err as Error).message}`);
+      throw new ServiceUnavailableException('Hệ thống gặp sự cố, vui lòng thử lại sau');
+    }
   }
 
   async get(key: string): Promise<string | null> {
-    return this.client.get(key);
+    try {
+      return await this.client.get(key);
+    } catch (err) {
+      this.logger.error(`[Redis] get failed for "${key}": ${(err as Error).message}`);
+      throw new ServiceUnavailableException('Hệ thống gặp sự cố, vui lòng thử lại sau');
+    }
   }
 
   async del(...keys: string[]): Promise<void> {
-    if (keys.length > 0) await this.client.del(...keys);
+    if (keys.length === 0) return;
+    try {
+      await this.client.del(...keys);
+    } catch (err) {
+      this.logger.warn(`[Redis] del failed for "${keys.join(', ')}": ${(err as Error).message}`);
+    }
   }
 
   // Hàm này dùng để lấy dữ liệu từ cache, nếu cache bị hỏng thì xoá để tránh poison
@@ -107,19 +123,23 @@ export class RedisService
     const pattern = `${prefix}*`;
     let cursor = '0';
     let total = 0;
-    do {
-      const [next, keys] = await this.client.scan(
-        cursor,
-        'MATCH',
-        pattern,
-        'COUNT',
-        200,
-      );
-      cursor = next;
-      if (keys.length > 0) {
-        total += await this.client.del(...keys);
-      }
-    } while (cursor !== '0');
+    try {
+      do {
+        const [next, keys] = await this.client.scan(
+          cursor,
+          'MATCH',
+          pattern,
+          'COUNT',
+          200,
+        );
+        cursor = next;
+        if (keys.length > 0) {
+          total += await this.client.del(...keys);
+        }
+      } while (cursor !== '0');
+    } catch (err) {
+      this.logger.warn(`[Redis] delByPrefix failed for "${prefix}": ${(err as Error).message}`);
+    }
     return total;
   }
 }

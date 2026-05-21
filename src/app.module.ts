@@ -1,7 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
+import { ResilientThrottlerGuard } from './common/guards/resilient-throttler.guard';
 import { createThrottlerOptions } from './config/rateLimit.config';
 import { HealthModule } from './modules/health/health.module';
 import { UsersModule } from './modules/users/users.module';
@@ -48,6 +49,6 @@ import { ReviewsModule } from './modules/reviews/reviews.module';
     ReviewsModule,
   ],
   controllers: [],
-  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
+  providers: [{ provide: APP_GUARD, useClass: ResilientThrottlerGuard }],
 })
 export class AppModule {}
