@@ -124,11 +124,13 @@ export const OrderSchema = SchemaFactory.createForClass(Order);
 
 OrderSchema.index({ orderCode: 1 }, { unique: true });
 OrderSchema.index({ userId: 1 });
+OrderSchema.index({ userId: 1, status: 1 });
 OrderSchema.index({ status: 1 });
 OrderSchema.index({ createdAt: -1 });
 OrderSchema.index({ paidAt: -1 });
 OrderSchema.index({ 'items.shopId': 1, paymentStatus: 1, paidAt: -1 });
 OrderSchema.index({ 'items.shopId': 1, status: 1, createdAt: -1 });
 OrderSchema.index({ 'items.productId': 1 });
+OrderSchema.index({ 'items.variantId': 1 });
 
 applyIdVirtual(OrderSchema);

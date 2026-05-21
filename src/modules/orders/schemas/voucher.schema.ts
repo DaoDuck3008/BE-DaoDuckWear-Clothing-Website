@@ -33,4 +33,5 @@ export class Voucher {
 export const VoucherSchema = SchemaFactory.createForClass(Voucher);
 
 VoucherSchema.index({ code: 1 }, { unique: true });
+VoucherSchema.index({ expiredAt: 1 }, { sparse: true });
 applyIdVirtual(VoucherSchema);

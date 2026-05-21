@@ -22,7 +22,7 @@ export class Category {
 export const CategorySchema = SchemaFactory.createForClass(Category);
 
 CategorySchema.index({ parentId: 1 });
-CategorySchema.index({ slug: 1 });
+CategorySchema.index({ slug: 1 }, { unique: true });
 
 CategorySchema.pre('findOneAndDelete', async function (this: any) {
   const category = await this.model.findOne(this.getFilter()).lean();

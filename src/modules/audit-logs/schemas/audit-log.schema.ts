@@ -35,4 +35,6 @@ export const AuditLogSchema = SchemaFactory.createForClass(AuditLog);
 
 AuditLogSchema.index({ userId: 1 });
 AuditLogSchema.index({ entityName: 1, entityId: 1 });
+AuditLogSchema.index({ createdAt: -1 });
+AuditLogSchema.index({ action: 1, createdAt: -1 });
 applyIdVirtual(AuditLogSchema);

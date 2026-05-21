@@ -25,5 +25,6 @@ export class Review {
 export const ReviewSchema = SchemaFactory.createForClass(Review);
 
 ReviewSchema.index({ productId: 1 });
+ReviewSchema.index({ productId: 1, deletedAt: 1 });
 ReviewSchema.index({ userId: 1 });
 applyIdVirtual(ReviewSchema);

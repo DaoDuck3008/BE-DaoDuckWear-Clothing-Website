@@ -50,8 +50,7 @@ export class Banner {
 
 export const BannerSchema = SchemaFactory.createForClass(Banner);
 
-BannerSchema.index({ page: 1, position: 1 });
-BannerSchema.index({ isActive: 1 });
-BannerSchema.index({ sortOrder: 1 });
+// Compound phục vụ query chính: find({ isActive, page, position }).sort(sortOrder)
+BannerSchema.index({ isActive: 1, page: 1, position: 1, sortOrder: 1 });
 
 applyIdVirtual(BannerSchema);

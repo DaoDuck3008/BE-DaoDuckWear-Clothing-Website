@@ -25,5 +25,6 @@ export class Inventory {
 export const InventorySchema = SchemaFactory.createForClass(Inventory);
 
 InventorySchema.index({ shopId: 1, variantId: 1 }, { unique: true });
+InventorySchema.index({ variantId: 1 });
 InventorySchema.index({ productId: 1 });
 applyIdVirtual(InventorySchema);

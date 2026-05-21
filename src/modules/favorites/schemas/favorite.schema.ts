@@ -16,4 +16,5 @@ export class Favorite {
 export const FavoriteSchema = SchemaFactory.createForClass(Favorite);
 
 FavoriteSchema.index({ userId: 1, productId: 1 }, { unique: true });
+FavoriteSchema.index({ productId: 1 });
 applyIdVirtual(FavoriteSchema);

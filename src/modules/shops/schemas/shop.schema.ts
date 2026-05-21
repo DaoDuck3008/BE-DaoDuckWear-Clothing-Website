@@ -35,13 +35,6 @@ ShopSchema.pre('findOneAndDelete', async function (this: any) {
   const shop = await this.model.findOne(this.getFilter()).lean();
   if (!shop) return;
 
-  await Promise.all([
-    this.model.db.model('Inventory').deleteMany({ shopId: shop._id }),
-    this.model.db.model('Order').updateMany(
-      { shopId: shop._id },
-      { $set: { shopId: null } },
-    ),
-  ]);
-
+  await this.model.db.model('Inventory').deleteMany({ shopId: shop._id });
 });
 applyIdVirtual(ShopSchema);

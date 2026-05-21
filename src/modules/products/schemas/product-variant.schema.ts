@@ -39,6 +39,7 @@ export const ProductVariantSchema =
 
 ProductVariantSchema.index({ sku: 1 }, { unique: true });
 ProductVariantSchema.index({ productId: 1 });
+ProductVariantSchema.index({ productId: 1, deletedAt: 1 });
 ProductVariantSchema.index({ colorHexId: 1 });
 ProductVariantSchema.pre('findOneAndDelete', async function (this: any) {
   const variant = await this.model.findOne(this.getFilter()).lean();
