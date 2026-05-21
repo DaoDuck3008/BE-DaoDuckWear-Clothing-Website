@@ -14,7 +14,7 @@ export const createThrottlerOptions = (): ThrottlerModuleOptions => {
     retryStrategy: (times) => Math.min(times * 500, 5000), // Vẫn reconnect ngầm
   });
 
-  // Suppressed: lỗi đã được ResilientThrottlerGuard xử lý và log
+  // Không thông báo lỗi do đã được resilientGuard xử lý
   redis.on('error', () => {});
 
   return {

@@ -21,6 +21,8 @@ export class RedisService
     const port = this.client.options.port;
     const start = Date.now();
     try {
+      // lazyConnect: true nên phải gọi connect() tường minh trước khi ra lệnh
+      await this.client.connect();
       const pong = await this.client.ping();
       const ms = Date.now() - start;
       if (pong === 'PONG') {

@@ -14,7 +14,8 @@ export const createRedisClient = () => {
   let wasConnected = false;
 
   client.on('ready', () => {
-    console.log(wasConnected ? '[Redis] Connection restored' : '[Redis] Connected');
+    // Initial connection log nằm ở onApplicationBootstrap() — chỉ log khi reconnect
+    if (wasConnected) console.log('[Redis] Connection restored');
     wasConnected = true;
   });
 
