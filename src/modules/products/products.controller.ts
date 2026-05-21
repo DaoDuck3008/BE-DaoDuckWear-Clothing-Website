@@ -12,6 +12,7 @@ import {
   Delete,
 } from '@nestjs/common';
 import { AnyFilesInterceptor } from '@nestjs/platform-express';
+import { multerImageOptions } from '../../common/utils/file-validation.util';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -27,7 +28,7 @@ export class ProductsController {
   @Post()
   @UseGuards(AuthGuard, RolesGuard)
   @Roles('ADMIN') // Chỉ ADMIN toàn hệ thống mới có quyền tạo sản phẩm
-  @UseInterceptors(AnyFilesInterceptor())
+  @UseInterceptors(AnyFilesInterceptor(multerImageOptions(10, 30)))
   async create(
     @Body() body: any,
     @UploadedFiles() files: Express.Multer.File[], // Lấy ảnh từ form-data
@@ -73,7 +74,7 @@ export class ProductsController {
   @Patch(':id')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles('ADMIN') // Chỉ ADMIN toàn hệ thống mới có quyền cập nhật sản phẩm
-  @UseInterceptors(AnyFilesInterceptor())
+  @UseInterceptors(AnyFilesInterceptor(multerImageOptions(10, 30)))
   async update(
     @Param('id') id: string,
     @Body() body: any,

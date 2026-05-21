@@ -12,6 +12,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { multerImageOptions } from '../../common/utils/file-validation.util';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { AuthGuard } from '../../common/guards/auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -48,10 +49,13 @@ export class BannersController {
   @UseGuards(AuthGuard, RolesGuard)
   @Roles('ADMIN')
   @UseInterceptors(
-    FileFieldsInterceptor([
-      { name: 'image', maxCount: 1 },
-      { name: 'mobileImage', maxCount: 1 },
-    ]),
+    FileFieldsInterceptor(
+      [
+        { name: 'image', maxCount: 1 },
+        { name: 'mobileImage', maxCount: 1 },
+      ],
+      multerImageOptions(10),
+    ),
   )
   create(
     @Body() dto: CreateBannerDto,
@@ -77,10 +81,13 @@ export class BannersController {
   @UseGuards(AuthGuard, RolesGuard)
   @Roles('ADMIN')
   @UseInterceptors(
-    FileFieldsInterceptor([
-      { name: 'image', maxCount: 1 },
-      { name: 'mobileImage', maxCount: 1 },
-    ]),
+    FileFieldsInterceptor(
+      [
+        { name: 'image', maxCount: 1 },
+        { name: 'mobileImage', maxCount: 1 },
+      ],
+      multerImageOptions(10),
+    ),
   )
   update(
     @Param('id') id: string,

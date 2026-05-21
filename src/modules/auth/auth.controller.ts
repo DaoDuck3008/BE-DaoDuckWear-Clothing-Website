@@ -14,6 +14,7 @@ import {
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { multerImageOptions } from '../../common/utils/file-validation.util';
 import { AuthService } from './auth.service';
 import {
   RegisterDto,
@@ -189,7 +190,7 @@ export class AuthController {
   @Post('profile/avatar')
   @Throttle({ global: { ttl: 60_000, limit: 10 } })
   @UseGuards(AuthGuard)
-  @UseInterceptors(FileInterceptor('avatar'))
+  @UseInterceptors(FileInterceptor('avatar', multerImageOptions(5)))
   async uploadAvatar(
     @CurrentUser() user: any,
     @UploadedFile() file: Express.Multer.File,
