@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Body,
   Query,
   Param,
@@ -14,6 +15,9 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentShopId } from '../../common/decorators/current-shop.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { CreateImportDto } from './dto/create-import.dto';
+import { ListImportsDto } from './dto/list-imports.dto';
+import { RevokeImportDto } from './dto/revoke-import.dto';
 
 @Controller('inventory')
 @UseGuards(AuthGuard, RolesGuard)
@@ -28,11 +32,48 @@ export class InventoryController {
     @Query() query: any,
   ) {
     const shopId = user.role === 'ADMIN' ? query.shopId : currentShopId;
-    // Nếu không phải admin thì phải có shopId
     if (user.role !== 'ADMIN' && !shopId) {
       throw new BadRequestException('Vui lòng chọn chi nhánh');
     }
     return this.inventoryService.findAllInventoryAdmin({ ...query, shopId });
+  }
+
+
+  @Post('imports')
+  @Roles('ADMIN', 'MANAGER', 'STAFF')
+  async createImport(
+    @CurrentUser() user: any,
+    @Body() body: CreateImportDto,
+  ) {
+    return this.inventoryService.createImport(user, body);
+  }
+
+  @Get('imports')
+  @Roles('ADMIN', 'MANAGER', 'STAFF')
+  async listImports(
+    @CurrentUser() user: any,
+    @Query() query: ListImportsDto,
+  ) {
+    return this.inventoryService.listImports(user, query);
+  }
+
+  @Get('imports/:id')
+  @Roles('ADMIN', 'MANAGER', 'STAFF')
+  async getImportDetail(
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+  ) {
+    return this.inventoryService.getImportDetail(user, id);
+  }
+
+  @Patch('imports/:id/revoke')
+  @Roles('ADMIN', 'MANAGER')
+  async revokeImport(
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+    @Body() body: RevokeImportDto,
+  ) {
+    return this.inventoryService.revokeImport(user, id, body);
   }
 
   @Get(':slug')
@@ -48,30 +89,5 @@ export class InventoryController {
       throw new BadRequestException('Vui lòng chọn chi nhánh');
     }
     return this.inventoryService.findOneProductInventory(slug, shopId);
-  }
-
-  @Post()
-  @Roles('ADMIN', 'MANAGER', 'STAFF')
-  async update(
-    @CurrentUser() user: any,
-    @CurrentShopId() currentShopId: string,
-    @Body() body: any,
-  ) {
-    const shopId =
-      user.role === 'ADMIN' ? body.shopId || currentShopId : currentShopId;
-    if (!shopId) {
-      throw new BadRequestException('Vui lòng chọn chi nhánh');
-    }
-    const { productId, variantId, quantity } = body;
-    if (!productId || !variantId || quantity === undefined) {
-      throw new BadRequestException('Thiếu thông tin cập nhật tồn kho');
-    }
-
-    return this.inventoryService.updateInventory({
-      shopId,
-      productId,
-      variantId,
-      quantity: Number(quantity),
-    });
   }
 }
