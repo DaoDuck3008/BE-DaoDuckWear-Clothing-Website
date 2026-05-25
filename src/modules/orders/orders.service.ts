@@ -370,75 +370,7 @@ export class OrdersService {
       status === OrderStatus.COMPLETED &&
       order.status !== OrderStatus.COMPLETED
     ) {
-      // Khi đơn hàng được hoàn thành, trừ số lượng đã đặt và số lượng đã reserved
-      const session = await this.connection.startSession();
-      session.startTransaction();
-      try {
-        for (const item of order.items) {
-          await this.inventoryModel.updateOne(
-            { variantId: item.variantId, shopId: item.shopId },
-            {
-              $inc: {
-                quantity: -item.quantity,
-                reservedQuantity: -item.quantity,
-              },
-            },
-            { session },
-          );
-        }
-        order.status = status as OrderStatus;
-        // Nếu đơn hàng chưa thanh toán thì thanh toán
-        if (order.paymentStatus !== PaymentStatus.PAID) {
-          order.paymentStatus = PaymentStatus.PAID;
-          order.paidAt = new Date();
-        }
-        await order.save({ session });
-        await session.commitTransaction();
-
-        // Fire-and-forget: gửi email cảm ơn + lời mời đánh giá
-        // Lưu userId trước khi session đóng để dùng trong IIFE
-        const orderUserId = order.userId?.toString();
-        const orderId = order._id.toString();
-        const orderCode = order.orderCode;
-        const orderItems = order.items.map((item) => ({
-          name: item.name,
-          image: item.image,
-          price: item.price,
-          quantity: item.quantity,
-          color: item.color,
-          size: item.size,
-        }));
-        const orderFinalTotal = order.finalTotal;
-
-        (async () => {
-          try {
-            if (!orderUserId) return;
-            // Query mới, không dùng session đã đóng
-            const userDoc = await this.orderModel.db
-              .collection('users')
-              .findOne(
-                { _id: new Types.ObjectId(orderUserId) },
-                { projection: { email: 1, username: 1 } },
-              );
-            if (!userDoc?.email) return;
-            await this.mailService.sendOrderCompletedEmail({
-              to: userDoc.email,
-              username: userDoc.username ?? 'bạn',
-              orderId,
-              orderCode,
-              items: orderItems,
-              finalTotal: orderFinalTotal,
-            });
-          } catch (err) {
-            console.error('[OrderCompleted] Gửi email thất bại:', err);
-          }
-        })();
-      } catch (error) {
-        await session.abortTransaction();
-        throw error;
-      } finally {
-        session.endSession();
-      }
+      await this.processCompletion(order);
     } else {
       order.status = status as OrderStatus;
       await order.save();
@@ -466,6 +398,89 @@ export class OrdersService {
 
     // 3. Xử lý hủy đơn hàng (giải phóng stock reservation)
     return this.processCancellation(order);
+  }
+
+  async confirmReceipt(id: string, userId: string) {
+    const order = await this.orderModel.findById(id);
+    if (!order) throw new NotFoundException('Đơn hàng không tồn tại');
+    if (order.userId?.toString() !== userId)
+      throw new BadRequestException('Bạn không có quyền xác nhận đơn hàng này');
+    if (order.status !== OrderStatus.SHIPPING)
+      throw new BadRequestException(
+        'Chỉ có thể xác nhận khi đơn hàng đang được giao',
+      );
+    return this.processCompletion(order);
+  }
+
+  private async processCompletion(order: OrderDocument) {
+    const session = await this.connection.startSession();
+    session.startTransaction();
+    try {
+      for (const item of order.items) {
+        await this.inventoryModel.updateOne(
+          { variantId: item.variantId, shopId: item.shopId },
+          {
+            $inc: {
+              quantity: -item.quantity,
+              reservedQuantity: -item.quantity,
+            },
+          },
+          { session },
+        );
+      }
+      order.status = OrderStatus.COMPLETED;
+      if (order.paymentStatus !== PaymentStatus.PAID) {
+        order.paymentStatus = PaymentStatus.PAID;
+        order.paidAt = new Date();
+      }
+      await order.save({ session });
+      await session.commitTransaction();
+      this.sendCompletionEmail(order);
+      return order;
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  }
+
+  private sendCompletionEmail(order: OrderDocument) {
+    const orderUserId = order.userId?.toString();
+    const orderId = order._id.toString();
+    const orderCode = order.orderCode;
+    const orderItems = order.items.map((item) => ({
+      name: item.name,
+      image: item.image,
+      price: item.price,
+      quantity: item.quantity,
+      color: item.color,
+      size: item.size,
+    }));
+    const orderFinalTotal = order.finalTotal;
+
+    (async () => {
+      try {
+        if (!orderUserId) return;
+        const userDoc = await this.orderModel.db
+          .collection('users')
+          .findOne(
+            { _id: new Types.ObjectId(orderUserId) },
+            { projection: { email: 1, username: 1 } },
+          );
+        if (!userDoc?.email) return;
+        await this.mailService.sendOrderCompletedEmail({
+          to: userDoc.email,
+          username: userDoc.username ?? 'bạn',
+          orderId,
+          orderCode,
+          items: orderItems,
+          finalTotal: orderFinalTotal,
+        });
+      } catch (err) {
+        console.error('[OrderCompleted] Gửi email thất bại:', err);
+      }
+    })();
   }
 
   private async processCancellation(order: OrderDocument) {

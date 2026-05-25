@@ -69,6 +69,12 @@ export class OrdersController {
     return this.ordersService.findByCode(orderCode, shopId);
   }
 
+  @UseGuards(AuthGuard)
+  @Patch('my-orders/:id/confirm-receipt')
+  async confirmReceipt(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.ordersService.confirmReceipt(id, user.id);
+  }
+
   @Patch(':id/status')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles('ADMIN', 'MANAGER', 'STAFF')
