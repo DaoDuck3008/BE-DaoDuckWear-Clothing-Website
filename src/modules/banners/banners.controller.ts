@@ -16,6 +16,7 @@ import { multerImageOptions } from '../../common/utils/file-validation.util';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { AuthGuard } from '../../common/guards/auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { BannersService } from './banners.service';
 import { CreateBannerDto } from './dto/create-banner.dto';
 import { UpdateBannerDto } from './dto/update-banner.dto';
@@ -64,19 +65,18 @@ export class BannersController {
       image?: Express.Multer.File[];
       mobileImage?: Express.Multer.File[];
     },
+    @CurrentUser() user: any,
   ) {
-    return this.bannersService.create(dto, files ?? {});
+    return this.bannersService.create(dto, files ?? {}, user.id);
   }
 
-  // Tắt/Bật trạng thái banner
   @Patch(':id/toggle')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles('ADMIN')
-  toggleStatus(@Param('id') id: string) {
-    return this.bannersService.toggleStatus(id);
+  toggleStatus(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.bannersService.toggleStatus(id, user.id);
   }
 
-  // Cập nhật banner
   @Patch(':id')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles('ADMIN')
@@ -97,15 +97,15 @@ export class BannersController {
       image?: Express.Multer.File[];
       mobileImage?: Express.Multer.File[];
     },
+    @CurrentUser() user: any,
   ) {
-    return this.bannersService.update(id, dto, files ?? {});
+    return this.bannersService.update(id, dto, files ?? {}, user.id);
   }
 
-  // Xóa banner
   @Delete(':id')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles('ADMIN')
-  remove(@Param('id') id: string) {
-    return this.bannersService.remove(id);
+  remove(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.bannersService.remove(id, user.id);
   }
 }

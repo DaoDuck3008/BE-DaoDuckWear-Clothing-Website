@@ -4,6 +4,7 @@ import { CategoriesController } from './categories.controller';
 import { CategoriesService } from './categories.service';
 import { Category, CategorySchema } from './schemas/category.schema';
 import { Product, ProductSchema } from '../products/schemas/product.schema';
+import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 
 @Module({
   imports: [
@@ -11,6 +12,7 @@ import { Product, ProductSchema } from '../products/schemas/product.schema';
       { name: Category.name, schema: CategorySchema },
       { name: Product.name, schema: ProductSchema },
     ]),
+    AuditLogsModule,
   ],
   controllers: [CategoriesController],
   providers: [CategoriesService],

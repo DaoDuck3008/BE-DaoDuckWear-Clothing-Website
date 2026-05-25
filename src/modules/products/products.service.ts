@@ -15,6 +15,7 @@ import { SlugGenerator } from '../../common/utils/slug.util';
 import { Inventory } from '../inventory/schemas/inventory.schema';
 import { Category } from '../categories/schemas/category.schema';
 import { RedisService } from '../redis/redis.service';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 const PRODUCT_SLUG_PREFIX = 'product:slug:';
 const PRODUCT_SIMILAR_PREFIX = 'product:similar:';
@@ -31,6 +32,7 @@ export class ProductsService {
     @InjectModel(Category.name) private readonly categoryModel: Model<any>,
     private readonly cloudinary: CloudinaryService,
     private readonly redis: RedisService,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   // Public: cho InventoryService gọi khi tồn kho thay đổi
@@ -53,6 +55,7 @@ export class ProductsService {
   async create(
     createProductDto: CreateProductDto,
     files: Express.Multer.File[],
+    actingUserId?: string,
   ) {
     const { name, categoryId, basePrice, description, status, variants } =
       createProductDto;
@@ -77,8 +80,9 @@ export class ProductsService {
     ); // Upload ảnh lên Cloudinary
 
     const session = await this.connection.startSession();
+    let result: any;
     try {
-      return await session.withTransaction(async () => {
+      result = await session.withTransaction(async () => {
         const product = await this.productModel.create(
           [
             {
@@ -132,6 +136,14 @@ export class ProductsService {
     } finally {
       await session.endSession();
     }
+    void this.auditLogsService.log({
+      userId: actingUserId,
+      action: 'CREATE_PRODUCT',
+      entityName: 'Product',
+      entityId: (result as any)?._id,
+      newData: { name: createProductDto.name, slug, basePrice: createProductDto.basePrice, status: createProductDto.status || 'active' },
+    });
+    return result;
   }
 
   async findAll(query: {
@@ -347,6 +359,7 @@ export class ProductsService {
     id: string,
     updateProductDto: UpdateProductDto,
     files: Express.Multer.File[], // File ảnh mới
+    actingUserId?: string,
   ) {
     const product = await this.productModel.findById(id);
     if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
@@ -393,8 +406,9 @@ export class ProductsService {
     const mergedImages = [...currentImages, ...newUploadResults];
 
     const session = await this.connection.startSession();
+    let result: any;
     try {
-      const result = await session.withTransaction(async () => {
+      result = await session.withTransaction(async () => {
         // 3. Cập nhật thông tin Product
         await this.productModel.findByIdAndUpdate(
           id,
@@ -490,14 +504,20 @@ export class ProductsService {
       if (slug !== previousSlug) {
         await this.invalidateProductCacheBySlug(slug);
       }
-
-      return result;
     } finally {
       await session.endSession();
     }
+    void this.auditLogsService.log({
+      userId: actingUserId,
+      action: 'UPDATE_PRODUCT',
+      entityName: 'Product',
+      entityId: id,
+      newData: { name: updateProductDto.name, slug, basePrice: updateProductDto.basePrice, status: updateProductDto.status },
+    });
+    return result;
   }
 
-  async remove(id: string) {
+  async remove(id: string, actingUserId?: string) {
     const product = await this.productModel.findById(id);
     if (!product) throw new BadRequestException('Sản phẩm không tồn tại');
 
@@ -509,6 +529,13 @@ export class ProductsService {
     );
 
     await this.invalidateProductCacheBySlug(product.slug);
+    void this.auditLogsService.log({
+      userId: actingUserId,
+      action: 'DELETE_PRODUCT',
+      entityName: 'Product',
+      entityId: id,
+      oldData: { name: product.name, slug: product.slug },
+    });
     return { message: 'Đã xóa sản phẩm thành công' };
   }
 

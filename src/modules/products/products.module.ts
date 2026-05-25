@@ -13,6 +13,7 @@ import {
   InventorySchema,
 } from '../inventory/schemas/inventory.schema';
 import { Category, CategorySchema } from '../categories/schemas/category.schema';
+import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { Category, CategorySchema } from '../categories/schemas/category.schema'
       { name: Inventory.name, schema: InventorySchema },
       { name: Category.name, schema: CategorySchema},
     ]),
+    AuditLogsModule,
   ],
   controllers: [ProductsController],
   providers: [ProductsService],

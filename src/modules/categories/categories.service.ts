@@ -12,6 +12,7 @@ import { BusinessException } from '../../common/exceptions/business.exception';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { RedisService } from '../redis/redis.service';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 const CATS_TREE_KEY = 'cats:tree';
 const CATS_TREE_TTL = 3600; // 1 giờ
@@ -24,6 +25,7 @@ export class CategoriesService {
     @InjectModel(Product.name)
     private readonly productModel: Model<any>,
     private readonly redis: RedisService,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   async findAllTree() {
@@ -69,7 +71,7 @@ export class CategoriesService {
     return result;
   }
 
-  async create(dto: CreateCategoryDto) {
+  async create(dto: CreateCategoryDto, actingUserId?: string) {
     const { name, parentId } = dto;
 
     if (parentId) {
@@ -86,10 +88,19 @@ export class CategoriesService {
     });
 
     await this.redis.del(CATS_TREE_KEY);
+
+    void this.auditLogsService.log({
+      userId: actingUserId,
+      action: 'CREATE_CATEGORY',
+      entityName: 'Category',
+      entityId: category._id,
+      newData: { name: category.name, slug: category.slug, parentId: dto.parentId ?? null },
+    });
+
     return { id: category._id, name: category.name, slug: category.slug };
   }
 
-  async update(id: string, dto: UpdateCategoryDto) {
+  async update(id: string, dto: UpdateCategoryDto, actingUserId?: string) {
     const category = await this.categoryModel.findOne({
       _id: id,
       deletedAt: null,
@@ -119,10 +130,20 @@ export class CategoriesService {
 
     await this.categoryModel.findByIdAndUpdate(id, { $set: updateData });
     await this.redis.del(CATS_TREE_KEY);
+
+    void this.auditLogsService.log({
+      userId: actingUserId,
+      action: 'UPDATE_CATEGORY',
+      entityName: 'Category',
+      entityId: id,
+      oldData: { name: category.name, slug: category.slug },
+      newData: updateData,
+    });
+
     return { message: 'Cập nhật danh mục thành công' };
   }
 
-  async remove(id: string) {
+  async remove(id: string, actingUserId?: string) {
     const category = await this.categoryModel.findOne({
       _id: id,
       deletedAt: null,
@@ -150,6 +171,15 @@ export class CategoriesService {
     });
 
     await this.redis.del(CATS_TREE_KEY);
+
+    void this.auditLogsService.log({
+      userId: actingUserId,
+      action: 'DELETE_CATEGORY',
+      entityName: 'Category',
+      entityId: id,
+      oldData: { name: category.name, slug: category.slug },
+    });
+
     return { message: 'Xóa danh mục thành công' };
   }
 

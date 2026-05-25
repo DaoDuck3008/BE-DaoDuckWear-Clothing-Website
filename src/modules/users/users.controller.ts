@@ -135,14 +135,14 @@ export class UsersController {
   @Patch('customers/:id/lock')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles('ADMIN')
-  async lockCustomer(@Param('id') id: string) {
-    return this.usersService.setCustomerLock(id, true);
+  async lockCustomer(@Param('id') id: string, @CurrentUser() user: AuthUserPayload) {
+    return this.usersService.setCustomerLock(id, true, user.id);
   }
 
   @Patch('customers/:id/unlock')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles('ADMIN')
-  async unlockCustomer(@Param('id') id: string) {
-    return this.usersService.setCustomerLock(id, false);
+  async unlockCustomer(@Param('id') id: string, @CurrentUser() user: AuthUserPayload) {
+    return this.usersService.setCustomerLock(id, false, user.id);
   }
 }

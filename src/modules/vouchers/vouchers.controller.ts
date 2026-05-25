@@ -39,8 +39,8 @@ export class VouchersController {
   @Post()
   @UseGuards(AuthGuard, RolesGuard)
   @Roles('ADMIN')
-  create(@Body() dto: CreateVoucherDto) {
-    return this.vouchersService.create(dto);
+  create(@Body() dto: CreateVoucherDto, @CurrentUser() user: any) {
+    return this.vouchersService.create(dto, user.id);
   }
 
   @Get()
@@ -53,14 +53,14 @@ export class VouchersController {
   @Patch(':id')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles('ADMIN')
-  update(@Param('id') id: string, @Body() dto: UpdateVoucherDto) {
-    return this.vouchersService.update(id, dto);
+  update(@Param('id') id: string, @Body() dto: UpdateVoucherDto, @CurrentUser() user: any) {
+    return this.vouchersService.update(id, dto, user.id);
   }
 
   @Delete(':id')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles('ADMIN')
-  remove(@Param('id') id: string) {
-    return this.vouchersService.softDelete(id);
+  remove(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.vouchersService.softDelete(id, user.id);
   }
 }

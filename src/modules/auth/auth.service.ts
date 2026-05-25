@@ -15,6 +15,7 @@ import {
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { MailService } from '../mail/mail.service';
 import { RedisService } from '../redis/redis.service';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import {
   hashPassword,
   comparePassword,
@@ -42,6 +43,7 @@ export class AuthService {
     private readonly cloudinaryService: CloudinaryService,
     private readonly mailService: MailService,
     private readonly redisService: RedisService,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   private async sendOtp(userId: string, email: string) {
@@ -85,6 +87,14 @@ export class AuthService {
     if (isEmailVerifyEnabled) {
       await this.sendOtp(userCreated._id.toString(), email);
     }
+
+    void this.auditLogsService.log({
+      userId: userCreated._id,
+      action: 'REGISTER',
+      entityName: 'User',
+      entityId: userCreated._id,
+      newData: { email: userCreated.email, username: userCreated.username },
+    });
 
     return {
       user: {
@@ -152,6 +162,14 @@ export class AuthService {
       user.id,
       REFRESH_TOKEN_TTL,
     );
+
+    void this.auditLogsService.log({
+      userId: user.id,
+      action: 'LOGIN',
+      entityName: 'User',
+      entityId: user._id,
+      newData: { email: user.email, role: role.name },
+    });
 
     return {
       user: {
@@ -472,6 +490,13 @@ export class AuthService {
     // Hash mật khẩu mới
     const hashed = await hashPassword(dto.newPassword);
     await this.userModel.findByIdAndUpdate(userId, { password: hashed });
+
+    void this.auditLogsService.log({
+      userId,
+      action: 'CHANGE_PASSWORD',
+      entityName: 'User',
+      entityId: userId,
+    });
 
     return { success: true, message: 'Đổi mật khẩu thành công' };
   }

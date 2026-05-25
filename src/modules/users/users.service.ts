@@ -21,6 +21,7 @@ import {
   UpdateStaffDto,
 } from './dto/staff.dto';
 import { ListCustomerQueryDto } from './dto/customer.dto';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 interface AuthUser {
   id: string;
@@ -47,6 +48,7 @@ export class UsersService {
     @InjectModel(Role.name) private readonly roleModel: Model<RoleDocument>,
     @InjectModel(Order.name) private readonly orderModel: Model<OrderDocument>,
     private readonly mailService: MailService,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   async findAll() {
@@ -314,6 +316,14 @@ export class UsersService {
       .populate('shopId', 'name _id')
       .lean();
 
+    void this.auditLogsService.log({
+      userId: actor.id,
+      action: 'CREATE_STAFF',
+      entityName: 'User',
+      entityId: created._id,
+      newData: { username: created.username, email: created.email, role: dto.role, shopId: dto.shopId ?? null },
+    });
+
     return this.serializeStaff(populated);
   }
 
@@ -410,6 +420,15 @@ export class UsersService {
       .populate('shopId', 'name _id')
       .lean();
 
+    void this.auditLogsService.log({
+      userId: actor.id,
+      action: 'UPDATE_STAFF',
+      entityName: 'User',
+      entityId: target._id,
+      oldData: { username: target.username, role: (target.roleId as any)?.name, shopId: (target.shopId as any)?._id?.toString?.() ?? null },
+      newData: updates,
+    });
+
     return this.serializeStaff(updated);
   }
 
@@ -434,6 +453,14 @@ export class UsersService {
 
     await this.userModel.findByIdAndUpdate(target._id, {
       $set: { deletedAt: new Date() },
+    });
+
+    void this.auditLogsService.log({
+      userId: actor.id,
+      action: 'DELETE_STAFF',
+      entityName: 'User',
+      entityId: target._id,
+      oldData: { username: target.username, email: target.email },
     });
 
     return { success: true };
@@ -473,6 +500,14 @@ export class UsersService {
       .catch((err) => {
         console.error('[staff reset mail] failed:', err?.message ?? err);
       });
+
+    void this.auditLogsService.log({
+      userId: actor.id,
+      action: 'RESET_STAFF_PASSWORD',
+      entityName: 'User',
+      entityId: target._id,
+      newData: { email: target.email, username: target.username },
+    });
 
     return { success: true };
   }
@@ -634,7 +669,7 @@ export class UsersService {
     };
   }
 
-  async setCustomerLock(id: string, locked: boolean) {
+  async setCustomerLock(id: string, locked: boolean, actingUserId?: string) {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Mã khách hàng không hợp lệ');
     }
@@ -654,6 +689,15 @@ export class UsersService {
     if (!updated) {
       throw new NotFoundException('Không tìm thấy khách hàng');
     }
+
+    void this.auditLogsService.log({
+      userId: actingUserId,
+      action: locked ? 'LOCK_CUSTOMER' : 'UNLOCK_CUSTOMER',
+      entityName: 'User',
+      entityId: updated._id,
+      oldData: { isLocked: !locked },
+      newData: { isLocked: locked },
+    });
 
     return this.serializeCustomer(updated);
   }

@@ -5,6 +5,7 @@ import { AuthService } from './auth.service';
 import { User, UserSchema } from '../users/schemas/user.schema';
 import { Role, RoleSchema } from '../roles/schemas/role.schema';
 import { MailModule } from '../mail/mail.module';
+import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { MailModule } from '../mail/mail.module';
       { name: Role.name, schema: RoleSchema },
     ]),
     MailModule,
+    AuditLogsModule,
   ],
   controllers: [AuthController],
   providers: [AuthService],

@@ -6,6 +6,7 @@ import { User, UserSchema } from './schemas/user.schema';
 import { Role, RoleSchema } from '../roles/schemas/role.schema';
 import { Order, OrderSchema } from '../orders/schemas/order.schema';
 import { MailModule } from '../mail/mail.module';
+import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { MailModule } from '../mail/mail.module';
       { name: Order.name, schema: OrderSchema },
     ]),
     MailModule,
+    AuditLogsModule,
   ],
   controllers: [UsersController],
   providers: [UsersService],

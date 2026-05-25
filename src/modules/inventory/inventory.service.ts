@@ -18,6 +18,7 @@ import { CreateImportDto } from './dto/create-import.dto';
 import { ListImportsDto } from './dto/list-imports.dto';
 import { RevokeImportDto } from './dto/revoke-import.dto';
 import { BusinessException } from '../../common/exceptions/business.exception';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 interface RequestUser {
   id: string;
@@ -38,6 +39,7 @@ export class InventoryService {
     @InjectModel(ProductVariant.name)
     private readonly variantModel: Model<any>,
     private readonly productsService: ProductsService,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   async findAllInventoryAdmin(query: {
@@ -276,6 +278,20 @@ export class InventoryService {
       product._id.toString(),
     );
 
+    void this.auditLogsService.log({
+      userId: user.id,
+      action: 'CREATE_INVENTORY_IMPORT',
+      entityName: 'InventoryImport',
+      entityId: importDoc._id,
+      newData: {
+        productId: dto.productId,
+        shopId: shopId,
+        totalQuantity,
+        itemCount: dto.items.length,
+        note: dto.note ?? null,
+      },
+    });
+
     return importDoc.toJSON();
   }
 
@@ -503,6 +519,15 @@ export class InventoryService {
     await this.productsService.invalidateProductCacheByProductId(
       doc.productId.toString(),
     );
+
+    void this.auditLogsService.log({
+      userId: user.id,
+      action: 'REVOKE_INVENTORY_IMPORT',
+      entityName: 'InventoryImport',
+      entityId: doc._id,
+      oldData: { status: 'ACTIVE' },
+      newData: { status: 'REVOKED', note: dto.note ?? null },
+    });
 
     return doc.toJSON();
   }

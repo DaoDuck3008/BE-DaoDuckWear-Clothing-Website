@@ -13,6 +13,7 @@ import {
   ProductVariantSchema,
 } from '../products/schemas/product-variant.schema';
 import { ProductsModule } from '../products/products.module';
+import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { ProductsModule } from '../products/products.module';
       { name: ProductVariant.name, schema: ProductVariantSchema },
     ]),
     ProductsModule,
+    AuditLogsModule,
   ],
   controllers: [InventoryController],
   providers: [InventoryService],

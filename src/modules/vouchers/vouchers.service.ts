@@ -14,11 +14,13 @@ import {
 import { CreateVoucherDto } from './dto/create-voucher.dto';
 import { UpdateVoucherDto } from './dto/update-voucher.dto';
 import { ListVouchersDto } from './dto/list-vouchers.dto';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 @Injectable()
 export class VouchersService {
   constructor(
     @InjectModel(Voucher.name) private voucherModel: Model<VoucherDocument>,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   async validateAndPreview(
@@ -115,7 +117,7 @@ export class VouchersService {
     }
   }
 
-  async create(dto: CreateVoucherDto): Promise<VoucherDocument> {
+  async create(dto: CreateVoucherDto, actingUserId?: string): Promise<VoucherDocument> {
     const existing = await this.voucherModel.findOne({
       code: dto.code,
       deletedAt: null,
@@ -128,6 +130,13 @@ export class VouchersService {
       ...dto,
       code: dto.code.toUpperCase().trim(),
       expiredAt: dto.expiredAt ? new Date(dto.expiredAt) : null,
+    });
+    void this.auditLogsService.log({
+      userId: actingUserId,
+      action: 'CREATE_VOUCHER',
+      entityName: 'Voucher',
+      entityId: voucher._id,
+      newData: { code: voucher.code, discountType: voucher.discountType, discountValue: voucher.discountValue },
     });
     return voucher;
   }
@@ -184,7 +193,7 @@ export class VouchersService {
     };
   }
 
-  async update(id: string, dto: UpdateVoucherDto): Promise<VoucherDocument> {
+  async update(id: string, dto: UpdateVoucherDto, actingUserId?: string): Promise<VoucherDocument> {
     const voucher = await this.voucherModel.findOne({ _id: id, deletedAt: null });
     if (!voucher) throw new NotFoundException('Voucher không tồn tại');
 
@@ -195,14 +204,28 @@ export class VouchersService {
 
     Object.assign(voucher, updateData);
     await voucher.save();
+    void this.auditLogsService.log({
+      userId: actingUserId,
+      action: 'UPDATE_VOUCHER',
+      entityName: 'Voucher',
+      entityId: voucher._id,
+      newData: dto,
+    });
     return voucher;
   }
 
-  async softDelete(id: string): Promise<void> {
+  async softDelete(id: string, actingUserId?: string): Promise<void> {
     const voucher = await this.voucherModel.findOne({ _id: id, deletedAt: null });
     if (!voucher) throw new NotFoundException('Voucher không tồn tại');
     voucher.deletedAt = new Date();
     await voucher.save();
+    void this.auditLogsService.log({
+      userId: actingUserId,
+      action: 'DELETE_VOUCHER',
+      entityName: 'Voucher',
+      entityId: voucher._id,
+      oldData: { code: voucher.code },
+    });
   }
 
   private calculateDiscount(voucher: Voucher, orderTotal: number): number {

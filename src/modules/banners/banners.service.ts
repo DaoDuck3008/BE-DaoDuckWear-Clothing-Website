@@ -10,6 +10,7 @@ import { CreateBannerDto } from './dto/create-banner.dto';
 import { UpdateBannerDto } from './dto/update-banner.dto';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { RedisService } from '../redis/redis.service';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 const BANNERS_PREFIX = 'banners:';
 const BANNERS_TTL = 600; // 10 phút
@@ -21,6 +22,7 @@ export class BannersService {
     private readonly bannerModel: Model<BannerDocument>,
     private readonly cloudinaryService: CloudinaryService,
     private readonly redis: RedisService,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   async findAll(query: {
@@ -66,6 +68,7 @@ export class BannersService {
       image?: Express.Multer.File[];
       mobileImage?: Express.Multer.File[];
     },
+    actingUserId?: string,
   ) {
     const imageFile = files.image?.[0];
     if (!imageFile) throw new BadRequestException('Ảnh banner là bắt buộc');
@@ -95,6 +98,15 @@ export class BannersService {
     });
 
     await this.invalidateBannersCache();
+
+    void this.auditLogsService.log({
+      userId: actingUserId,
+      action: 'CREATE_BANNER',
+      entityName: 'Banner',
+      entityId: banner._id,
+      newData: { title: (banner as any).title, page: (banner as any).page, position: (banner as any).position, isActive: (banner as any).isActive },
+    });
+
     return banner.toJSON();
   }
 
@@ -105,6 +117,7 @@ export class BannersService {
       image?: Express.Multer.File[];
       mobileImage?: Express.Multer.File[];
     },
+    actingUserId?: string,
   ) {
     const banner = await this.bannerModel.findOne({ _id: id, deletedAt: null });
     if (!banner) throw new NotFoundException('Không tìm thấy banner');
@@ -137,23 +150,50 @@ export class BannersService {
       .findByIdAndUpdate(id, updateData, { new: true })
       .lean();
     await this.invalidateBannersCache();
+
+    void this.auditLogsService.log({
+      userId: actingUserId,
+      action: 'UPDATE_BANNER',
+      entityName: 'Banner',
+      entityId: id,
+      newData: updateData,
+    });
+
     return updated;
   }
 
-  async remove(id: string) {
+  async remove(id: string, actingUserId?: string) {
     const banner = await this.bannerModel.findOne({ _id: id, deletedAt: null });
     if (!banner) throw new NotFoundException('Không tìm thấy banner');
     await this.bannerModel.findByIdAndUpdate(id, { deletedAt: new Date() });
     await this.invalidateBannersCache();
+
+    void this.auditLogsService.log({
+      userId: actingUserId,
+      action: 'DELETE_BANNER',
+      entityName: 'Banner',
+      entityId: id,
+      oldData: { title: (banner as any).title },
+    });
   }
 
-  async toggleStatus(id: string) {
+  async toggleStatus(id: string, actingUserId?: string) {
     const banner = await this.bannerModel.findOne({ _id: id, deletedAt: null });
     if (!banner) throw new NotFoundException('Không tìm thấy banner');
     const updated = await this.bannerModel
       .findByIdAndUpdate(id, { isActive: !banner.isActive }, { new: true })
       .lean();
     await this.invalidateBannersCache();
+
+    void this.auditLogsService.log({
+      userId: actingUserId,
+      action: 'TOGGLE_BANNER_STATUS',
+      entityName: 'Banner',
+      entityId: id,
+      oldData: { isActive: banner.isActive },
+      newData: { isActive: !banner.isActive },
+    });
+
     return updated;
   }
 }

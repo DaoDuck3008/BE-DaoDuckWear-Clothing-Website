@@ -20,6 +20,7 @@ import { AuthGuard } from '../../common/guards/auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentShopId } from '../../common/decorators/current-shop.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @Controller('products')
 export class ProductsController {
@@ -31,10 +32,10 @@ export class ProductsController {
   @UseInterceptors(AnyFilesInterceptor(multerImageOptions(10, 30)))
   async create(
     @Body() body: any,
-    @UploadedFiles() files: Express.Multer.File[], // Lấy ảnh từ form-data
+    @UploadedFiles() files: Express.Multer.File[],
+    @CurrentUser() user: any,
   ) {
     const createProductDto: CreateProductDto = {
-      // Ép kiểu dữ liệu từ JSON String về đúng kiểu dữ liệu thông qua DTO
       ...body,
       variants:
         typeof body.variants === 'string'
@@ -43,7 +44,7 @@ export class ProductsController {
       basePrice: Number(body.basePrice),
     };
 
-    return this.productsService.create(createProductDto, files);
+    return this.productsService.create(createProductDto, files, user.id);
   }
 
   @Get('admin')
@@ -79,6 +80,7 @@ export class ProductsController {
     @Param('id') id: string,
     @Body() body: any,
     @UploadedFiles() files: Express.Multer.File[],
+    @CurrentUser() user: any,
   ) {
     const updateProductDto: UpdateProductDto = {
       ...body,
@@ -93,13 +95,13 @@ export class ProductsController {
       basePrice: body.basePrice ? Number(body.basePrice) : undefined,
     };
 
-    return this.productsService.update(id, updateProductDto, files);
+    return this.productsService.update(id, updateProductDto, files, user.id);
   }
 
   @Delete(':id')
   @UseGuards(AuthGuard, RolesGuard)
-  @Roles('ADMIN') // Chỉ ADMIN toàn hệ thống mới có quyền xóa sản phẩm
-  async remove(@Param('id') id: string) {
-    return this.productsService.remove(id);
+  @Roles('ADMIN')
+  async remove(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.productsService.remove(id, user.id);
   }
 }
