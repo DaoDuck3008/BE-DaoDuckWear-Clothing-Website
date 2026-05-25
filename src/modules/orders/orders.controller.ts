@@ -82,8 +82,9 @@ export class OrdersController {
     @Param('id') id: string,
     @Body('status') status: string,
     @CurrentShopId() shopId: string,
+    @CurrentUser() user: any,
   ) {
-    return this.ordersService.updateStatus(id, status, shopId);
+    return this.ordersService.updateStatus(id, status, shopId, user.id);
   }
 
   @UseGuards(AuthGuard)

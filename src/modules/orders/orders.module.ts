@@ -17,11 +17,13 @@ import { CartService } from '../cart/cart.service';
 import { Shop, ShopSchema } from '../shops/schemas/shop.schema';
 import { MailModule } from '../mail/mail.module';
 import { VouchersModule } from '../vouchers/vouchers.module';
+import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 
 @Module({
   imports: [
     MailModule,
     VouchersModule,
+    AuditLogsModule,
     MongooseModule.forFeature([
       { name: Order.name, schema: OrderSchema },
       { name: Product.name, schema: ProductSchema },

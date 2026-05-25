@@ -24,11 +24,6 @@ export class AuditLog {
   @Prop({ type: Object, default: null })
   newData?: Record<string, any> | null;
 
-  @Prop({ type: String, default: null })
-  ipAddress?: string | null;
-
-  @Prop({ type: String, default: null })
-  userAgent?: string | null;
 }
 
 export const AuditLogSchema = SchemaFactory.createForClass(AuditLog);

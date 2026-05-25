@@ -24,6 +24,7 @@ import { RedisModule } from './modules/redis/redis.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
 import { VouchersModule } from './modules/vouchers/vouchers.module';
+import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { VouchersModule } from './modules/vouchers/vouchers.module';
     AnalyticsModule,
     ReviewsModule,
     VouchersModule,
+    AuditLogsModule,
   ],
   controllers: [],
   providers: [{ provide: APP_GUARD, useClass: ResilientThrottlerGuard }],

@@ -28,6 +28,7 @@ import { formatDateCode } from 'src/common/utils/date.util';
 import { CartService } from '../cart/cart.service';
 import { MailService } from '../mail/mail.service';
 import { VouchersService } from '../vouchers/vouchers.service';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 @Injectable()
 export class OrdersService {
@@ -42,6 +43,7 @@ export class OrdersService {
     private readonly cartService: CartService,
     private readonly mailService: MailService,
     private readonly vouchersService: VouchersService,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   async createOrder(createOrderDto: CreateOrderDto, userId: string) {
@@ -165,6 +167,22 @@ export class OrdersService {
       }
 
       await session.commitTransaction();
+
+      void this.auditLogsService.log({
+        userId,
+        action: 'CREATE_ORDER',
+        entityName: 'Order',
+        entityId: newOrder._id,
+        newData: {
+          orderCode: newOrder.orderCode,
+          totalAmount: newOrder.totalAmount,
+          finalTotal: newOrder.finalTotal,
+          paymentMethod: newOrder.paymentMethod,
+          status: newOrder.status,
+          itemCount: snapshotItems.length,
+        },
+      });
+
       return newOrder;
     } catch (error) {
       await session.abortTransaction();
@@ -344,7 +362,12 @@ export class OrdersService {
     };
   }
 
-  async updateStatus(id: string, status: string, shopId: string) {
+  async updateStatus(
+    id: string,
+    status: string,
+    shopId: string,
+    actingUserId?: string,
+  ) {
     const order = await this.orderModel.findById(id);
     if (!order) throw new NotFoundException('Đơn hàng không tồn tại');
 
@@ -360,12 +383,23 @@ export class OrdersService {
       }
     }
 
+    const oldStatus = order.status;
+
     // Xử lý khi đơn hàng được hủy
     if (
       status === OrderStatus.CANCELLED &&
       order.status !== OrderStatus.CANCELLED
     ) {
-      return this.processCancellation(order);
+      const result = await this.processCancellation(order);
+      void this.auditLogsService.log({
+        userId: actingUserId,
+        action: 'UPDATE_ORDER_STATUS',
+        entityName: 'Order',
+        entityId: order._id,
+        oldData: { orderCode: order.orderCode, status: oldStatus },
+        newData: { orderCode: order.orderCode, status: result.status },
+      });
+      return result;
     } else if (
       status === OrderStatus.COMPLETED &&
       order.status !== OrderStatus.COMPLETED
@@ -375,6 +409,15 @@ export class OrdersService {
       order.status = status as OrderStatus;
       await order.save();
     }
+
+    void this.auditLogsService.log({
+      userId: actingUserId,
+      action: 'UPDATE_ORDER_STATUS',
+      entityName: 'Order',
+      entityId: order._id,
+      oldData: { orderCode: order.orderCode, status: oldStatus },
+      newData: { orderCode: order.orderCode, status: order.status },
+    });
 
     return order;
   }
@@ -397,7 +440,19 @@ export class OrdersService {
     }
 
     // 3. Xử lý hủy đơn hàng (giải phóng stock reservation)
-    return this.processCancellation(order);
+    const oldStatus = order.status;
+    const result = await this.processCancellation(order);
+
+    void this.auditLogsService.log({
+      userId,
+      action: 'CANCEL_ORDER',
+      entityName: 'Order',
+      entityId: order._id,
+      oldData: { orderCode: order.orderCode, status: oldStatus },
+      newData: { orderCode: order.orderCode, status: result.status },
+    });
+
+    return result;
   }
 
   async confirmReceipt(id: string, userId: string) {
@@ -409,7 +464,20 @@ export class OrdersService {
       throw new BadRequestException(
         'Chỉ có thể xác nhận khi đơn hàng đang được giao',
       );
-    return this.processCompletion(order);
+
+    const oldStatus = order.status;
+    const result = await this.processCompletion(order);
+
+    void this.auditLogsService.log({
+      userId,
+      action: 'CONFIRM_RECEIPT',
+      entityName: 'Order',
+      entityId: order._id,
+      oldData: { orderCode: order.orderCode, status: oldStatus },
+      newData: { orderCode: order.orderCode, status: result.status },
+    });
+
+    return result;
   }
 
   private async processCompletion(order: OrderDocument) {
