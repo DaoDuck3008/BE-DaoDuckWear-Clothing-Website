@@ -27,6 +27,7 @@ import { formatDateCode } from 'src/common/utils/date.util';
 
 import { CartService } from '../cart/cart.service';
 import { MailService } from '../mail/mail.service';
+import { VouchersService } from '../vouchers/vouchers.service';
 
 @Injectable()
 export class OrdersService {
@@ -40,15 +41,19 @@ export class OrdersService {
     @InjectConnection() private readonly connection: Connection,
     private readonly cartService: CartService,
     private readonly mailService: MailService,
+    private readonly vouchersService: VouchersService,
   ) {}
 
   async createOrder(createOrderDto: CreateOrderDto, userId: string) {
+    const { shippingAddress, paymentMethod, buyNowItem, voucherCode } =
+      createOrderDto;
+
+    let discountAmount = 0;
+
     const session = await this.connection.startSession();
     session.startTransaction();
 
     try {
-      const { shippingAddress, paymentMethod, buyNowItem } = createOrderDto;
-
       const snapshotItems: any[] = [];
       let totalAmount = 0;
 
@@ -121,11 +126,22 @@ export class OrdersService {
         });
       }
 
+      // 3. Áp dụng voucher (validate với totalAmount thực + atomic increment)
+      if (voucherCode) {
+        const preview = await this.vouchersService.validateAndPreview(
+          voucherCode,
+          totalAmount,
+          userId,
+        );
+        discountAmount = preview.discountAmount;
+        await this.vouchersService.applyVoucher(voucherCode, userId, session);
+      }
+
       const shippingFee = 30000;
-      const finalTotal = totalAmount + shippingFee;
+      const finalTotal = totalAmount + shippingFee - discountAmount;
       const orderCode = `DDW-${formatDateCode()}-${generateUniqueHex()}`;
 
-      // 3. Tạo đơn hàng
+      // 4. Tạo đơn hàng
       const newOrder = new this.orderModel({
         orderCode,
         userId: userId ? new Types.ObjectId(userId) : null,
@@ -133,6 +149,8 @@ export class OrdersService {
         items: snapshotItems,
         totalAmount,
         shippingFee,
+        voucherCode: voucherCode ? voucherCode.toUpperCase().trim() : null,
+        discountAmount,
         finalTotal,
         paymentMethod,
         status: OrderStatus.PENDING,
@@ -141,7 +159,7 @@ export class OrdersService {
 
       await newOrder.save({ session });
 
-      // 4. Xóa giỏ hàng sau khi tạo đơn nếu không phải mua ngay
+      // 5. Xóa giỏ hàng sau khi tạo đơn nếu không phải mua ngay
       if (!buyNowItem) {
         await this.cartService.clearCart(userId);
       }

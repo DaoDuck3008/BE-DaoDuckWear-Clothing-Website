@@ -89,6 +89,12 @@ export class Order {
   @Prop({ type: Number, default: 0 })
   shippingFee!: number;
 
+  @Prop({ type: String, default: null })
+  voucherCode?: string | null;
+
+  @Prop({ type: Number, default: 0 })
+  discountAmount!: number;
+
   @Prop({ type: Number, required: true })
   finalTotal!: number;
 

@@ -23,6 +23,7 @@ import { MailModule } from './modules/mail/mail.module';
 import { RedisModule } from './modules/redis/redis.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
+import { VouchersModule } from './modules/vouchers/vouchers.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { ReviewsModule } from './modules/reviews/reviews.module';
     HealthModule,
     AnalyticsModule,
     ReviewsModule,
+    VouchersModule,
   ],
   controllers: [],
   providers: [{ provide: APP_GUARD, useClass: ResilientThrottlerGuard }],

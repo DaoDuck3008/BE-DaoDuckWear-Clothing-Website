@@ -16,10 +16,12 @@ import { Cart, CartSchema } from '../cart/schemas/cart.schema';
 import { CartService } from '../cart/cart.service';
 import { Shop, ShopSchema } from '../shops/schemas/shop.schema';
 import { MailModule } from '../mail/mail.module';
+import { VouchersModule } from '../vouchers/vouchers.module';
 
 @Module({
   imports: [
     MailModule,
+    VouchersModule,
     MongooseModule.forFeature([
       { name: Order.name, schema: OrderSchema },
       { name: Product.name, schema: ProductSchema },

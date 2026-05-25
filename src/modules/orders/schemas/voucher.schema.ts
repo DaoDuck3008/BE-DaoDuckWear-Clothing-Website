@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument } from 'mongoose';
+import { HydratedDocument, Schema as MongooseSchema, Types } from 'mongoose';
 import { applyIdVirtual } from '../../../common/utils/mongoose-schema.util';
 
 export type VoucherDocument = HydratedDocument<Voucher>;
@@ -23,6 +23,18 @@ export class Voucher {
   @Prop({ type: Number, default: null })
   minOrderValue?: number | null;
 
+  @Prop({ type: Number, default: null })
+  maxDiscountAmount?: number | null;
+
+  @Prop({ type: Number, default: null })
+  usageLimit?: number | null;
+
+  @Prop({ type: Number, default: 0 })
+  usedCount!: number;
+
+  @Prop({ type: [MongooseSchema.Types.ObjectId], ref: 'User', default: [] })
+  usedByUsers!: Types.ObjectId[];
+
   @Prop({ type: Date, default: null })
   expiredAt?: Date | null;
 
@@ -34,4 +46,5 @@ export const VoucherSchema = SchemaFactory.createForClass(Voucher);
 
 VoucherSchema.index({ code: 1 }, { unique: true });
 VoucherSchema.index({ expiredAt: 1 }, { sparse: true });
+VoucherSchema.index({ usedByUsers: 1 });
 applyIdVirtual(VoucherSchema);

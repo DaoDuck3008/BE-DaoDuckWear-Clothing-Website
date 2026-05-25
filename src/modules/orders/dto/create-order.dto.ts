@@ -105,4 +105,8 @@ export class CreateOrderDto {
   @IsEnum(['COD', 'BANK_TRANSFER', 'VNPAY', 'MOMO'])
   @IsNotEmpty()
   paymentMethod!: string;
+
+  @IsString()
+  @IsOptional()
+  voucherCode?: string;
 }
