@@ -6,12 +6,16 @@ import { UserSchema } from '../../modules/users/schemas/user.schema';
 import { ShopSchema } from '../../modules/shops/schemas/shop.schema';
 import { CategorySchema } from '../../modules/categories/schemas/category.schema';
 import { ColorSchema } from '../../modules/colors/schemas/color.schema';
+import { ConversationSchema } from '../../modules/chat/schemas/conversation.schema';
+import { MessageSchema } from '../../modules/chat/schemas/message.schema';
 
 const RoleModel = mongoose.model('Role', RoleSchema);
 const UserModel = mongoose.model('User', UserSchema);
 const ShopModel = mongoose.model('Shop', ShopSchema);
 const CategoryModel = mongoose.model('Category', CategorySchema);
 const ColorModel = mongoose.model('Color', ColorSchema);
+const ConversationModel = mongoose.model('Conversation', ConversationSchema);
+const MessageModel = mongoose.model('Message', MessageSchema);
 
 function slugify(text: string) {
   return text
@@ -41,6 +45,8 @@ async function main() {
     RoleModel.deleteMany({}),
     ShopModel.deleteMany({}),
     ColorModel.deleteMany({}),
+    ConversationModel.deleteMany({}),
+    MessageModel.deleteMany({}),
   ]);
 
   const shopsData = [
@@ -69,7 +75,9 @@ async function main() {
   const defaultShopId = shopBySlug.get('daoduck-hanoi');
 
   const roles = await RoleModel.insertMany(
-    ['USER', 'STAFF', 'MANAGER', 'ADMIN'].map((name) => ({ name })),
+    ['USER', 'STAFF', 'MANAGER', 'ADMIN', 'RECEPTIONIST'].map((name) => ({
+      name,
+    })),
   );
   const roleMap = new Map(roles.map((role) => [role.name, role._id]));
 
@@ -105,6 +113,16 @@ async function main() {
       hireDate: new Date('2024-03-15'),
       employmentStatus: 'active',
     },
+    {
+      username: 'receptionist',
+      email: 'receptionist@daoduck.com',
+      role: 'RECEPTIONIST',
+      shopId: defaultShopId,
+      fullName: 'Lê Thị Lễ Tân',
+      position: 'Lễ tân / Chăm sóc khách hàng',
+      hireDate: new Date('2024-04-01'),
+      employmentStatus: 'active',
+    },
   ];
 
   await UserModel.insertMany(
@@ -123,7 +141,7 @@ async function main() {
     })),
   );
 
-  await UserModel.insertMany(
+  const customers = await UserModel.insertMany(
     Array.from({ length: 7 }, (_, index) => ({
       username: `user${index + 1}`,
       email: `user${index + 1}@daoduck.com`,
@@ -199,6 +217,43 @@ async function main() {
   ];
 
   await ColorModel.insertMany(colorsData);
+
+  // Hội thoại chat mẫu giữa user1 và chi nhánh Hà Nội
+  if (customers[0] && defaultShopId) {
+    const now = Date.now();
+    const conversation = await ConversationModel.create({
+      customerId: customers[0]._id,
+      shopId: defaultShopId,
+      lastMessage: 'Dạ bên em còn size M màu đen ạ.',
+      lastMessageAt: new Date(now),
+      customerUnread: 1,
+      shopUnread: 0,
+    });
+
+    const receptionist = await UserModel.findOne({
+      email: 'receptionist@daoduck.com',
+    });
+
+    await MessageModel.insertMany([
+      {
+        conversationId: conversation._id,
+        senderId: customers[0]._id,
+        senderType: 'customer',
+        content: 'Chào shop, áo sơ mi này còn size M không ạ?',
+        createdAt: new Date(now - 60_000),
+        updatedAt: new Date(now - 60_000),
+      },
+      {
+        conversationId: conversation._id,
+        senderId: receptionist?._id ?? customers[0]._id,
+        senderType: 'shop',
+        content: 'Dạ bên em còn size M màu đen ạ.',
+        createdAt: new Date(now),
+        updatedAt: new Date(now),
+      },
+    ]);
+  }
+
   console.log('Seed dữ liệu MongoDB thành công.');
 }
 

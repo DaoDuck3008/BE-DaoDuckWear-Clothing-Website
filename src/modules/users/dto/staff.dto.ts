@@ -12,7 +12,12 @@ import {
   Min,
 } from 'class-validator';
 
-export const STAFF_ROLES = ['ADMIN', 'MANAGER', 'STAFF'] as const;
+export const STAFF_ROLES = [
+  'ADMIN',
+  'MANAGER',
+  'STAFF',
+  'RECEPTIONIST',
+] as const;
 export type StaffRoleName = (typeof STAFF_ROLES)[number];
 
 export const EMPLOYMENT_STATUSES = ['active', 'onLeave', 'terminated'] as const;

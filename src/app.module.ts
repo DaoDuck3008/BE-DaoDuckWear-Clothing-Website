@@ -25,6 +25,7 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
 import { VouchersModule } from './modules/vouchers/vouchers.module';
 import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
+import { ChatModule } from './modules/chat/chat.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
     ReviewsModule,
     VouchersModule,
     AuditLogsModule,
+    ChatModule,
   ],
   controllers: [],
   providers: [{ provide: APP_GUARD, useClass: ResilientThrottlerGuard }],
