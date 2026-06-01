@@ -42,7 +42,11 @@ export class CategoriesController {
   @Patch(':id')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles('ADMIN')
-  update(@Param('id') id: string, @Body() dto: UpdateCategoryDto, @CurrentUser() user: any) {
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateCategoryDto,
+    @CurrentUser() user: any,
+  ) {
     return this.categoriesService.update(id, dto, user.id);
   }
 

@@ -52,8 +52,12 @@ export class RedisService
     try {
       await this.client.set(key, value, 'EX', ttlSeconds);
     } catch (err) {
-      this.logger.error(`[Redis] set failed for "${key}": ${(err as Error).message}`);
-      throw new ServiceUnavailableException('Hệ thống gặp sự cố, vui lòng thử lại sau');
+      this.logger.error(
+        `[Redis] set failed for "${key}": ${(err as Error).message}`,
+      );
+      throw new ServiceUnavailableException(
+        'Hệ thống gặp sự cố, vui lòng thử lại sau',
+      );
     }
   }
 
@@ -61,8 +65,12 @@ export class RedisService
     try {
       return await this.client.get(key);
     } catch (err) {
-      this.logger.error(`[Redis] get failed for "${key}": ${(err as Error).message}`);
-      throw new ServiceUnavailableException('Hệ thống gặp sự cố, vui lòng thử lại sau');
+      this.logger.error(
+        `[Redis] get failed for "${key}": ${(err as Error).message}`,
+      );
+      throw new ServiceUnavailableException(
+        'Hệ thống gặp sự cố, vui lòng thử lại sau',
+      );
     }
   }
 
@@ -71,7 +79,9 @@ export class RedisService
     try {
       await this.client.del(...keys);
     } catch (err) {
-      this.logger.warn(`[Redis] del failed for "${keys.join(', ')}": ${(err as Error).message}`);
+      this.logger.warn(
+        `[Redis] del failed for "${keys.join(', ')}": ${(err as Error).message}`,
+      );
     }
   }
 
@@ -140,7 +150,9 @@ export class RedisService
         }
       } while (cursor !== '0');
     } catch (err) {
-      this.logger.warn(`[Redis] delByPrefix failed for "${prefix}": ${(err as Error).message}`);
+      this.logger.warn(
+        `[Redis] delByPrefix failed for "${prefix}": ${(err as Error).message}`,
+      );
     }
     return total;
   }

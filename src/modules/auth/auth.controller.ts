@@ -183,7 +183,10 @@ export class AuthController {
   @Patch('change-password')
   @Throttle({ global: { ttl: 60_000, limit: 5 } })
   @UseGuards(AuthGuard)
-  async changePassword(@CurrentUser() user: any, @Body() dto: ChangePasswordDto) {
+  async changePassword(
+    @CurrentUser() user: any,
+    @Body() dto: ChangePasswordDto,
+  ) {
     return this.authService.changePassword(user.id, dto);
   }
 

@@ -37,9 +37,7 @@ async function main() {
     ? await UserModel.findOne({ roleId: adminRole._id }).lean()
     : null;
 
-  const products = await ProductModel.find({ deletedAt: null })
-    .limit(5)
-    .lean();
+  const products = await ProductModel.find({ deletedAt: null }).limit(5).lean();
   if (products.length === 0) {
     console.log('Không có sản phẩm nào — bỏ qua seed phiếu nhập.');
     return;
@@ -67,11 +65,13 @@ async function main() {
       }).lean();
       if (variants.length === 0) continue;
 
-      const items = variants.slice(0, Math.min(3, variants.length)).map((v) => ({
-        variantId: v._id,
-        quantity: 10 + Math.floor(Math.random() * 20),
-        sku: v.sku,
-      }));
+      const items = variants
+        .slice(0, Math.min(3, variants.length))
+        .map((v) => ({
+          variantId: v._id,
+          quantity: 10 + Math.floor(Math.random() * 20),
+          sku: v.sku,
+        }));
       const totalQuantity = items.reduce((s, i) => s + i.quantity, 0);
 
       const bulkOps = items.map((item) => ({

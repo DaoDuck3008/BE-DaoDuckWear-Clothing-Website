@@ -6,7 +6,7 @@ export const createRedisClient = () => {
     port: +(process.env.REDIS_PORT ?? 6379),
     password: process.env.REDIS_PASSWORD || undefined,
     lazyConnect: true,
-    maxRetriesPerRequest: 0,   // Fail fast, không đợi 20 retries mỗi command
+    maxRetriesPerRequest: 0, // Fail fast, không đợi 20 retries mỗi command
     enableOfflineQueue: false, // Reject command ngay khi offline
     retryStrategy: (times) => Math.min(times * 500, 5000),
   });

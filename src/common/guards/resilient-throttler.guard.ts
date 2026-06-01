@@ -9,7 +9,9 @@ export class ResilientThrottlerGuard extends ThrottlerGuard {
     try {
       return await super.canActivate(context);
     } catch (err) {
-      this.logger.warn(`Throttler storage unavailable, bypassing rate limit: ${(err as Error).message}`);
+      this.logger.warn(
+        `Throttler storage unavailable, bypassing rate limit: ${(err as Error).message}`,
+      );
       return true;
     }
   }

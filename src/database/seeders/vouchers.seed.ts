@@ -1,6 +1,9 @@
 import 'dotenv/config';
 import mongoose from 'mongoose';
-import { VoucherSchema, DiscountType } from '../../modules/orders/schemas/voucher.schema';
+import {
+  VoucherSchema,
+  DiscountType,
+} from '../../modules/orders/schemas/voucher.schema';
 
 const VoucherModel = mongoose.model('Voucher', VoucherSchema);
 
@@ -15,7 +18,7 @@ async function main() {
 
   const now = new Date();
   const futureDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 ngày tới
-  const pastDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);        // hôm qua
+  const pastDate = new Date(now.getTime() - 24 * 60 * 60 * 1000); // hôm qua
 
   await VoucherModel.insertMany([
     {

@@ -4,7 +4,10 @@ import { applyIdVirtual } from '../../../common/utils/mongoose-schema.util';
 
 export type AuditLogDocument = HydratedDocument<AuditLog>;
 
-@Schema({ timestamps: { createdAt: true, updatedAt: false }, collection: 'audit_logs' })
+@Schema({
+  timestamps: { createdAt: true, updatedAt: false },
+  collection: 'audit_logs',
+})
 export class AuditLog {
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', default: null })
   userId?: Types.ObjectId | null;
@@ -23,7 +26,6 @@ export class AuditLog {
 
   @Prop({ type: Object, default: null })
   newData?: Record<string, any> | null;
-
 }
 
 export const AuditLogSchema = SchemaFactory.createForClass(AuditLog);

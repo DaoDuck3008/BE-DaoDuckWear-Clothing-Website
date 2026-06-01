@@ -12,7 +12,11 @@ export class Inventory {
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Product', required: true })
   productId!: Types.ObjectId;
 
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'ProductVariant', required: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'ProductVariant',
+    required: true,
+  })
   variantId!: Types.ObjectId;
 
   @Prop({ type: Number, default: 0, min: 0 })

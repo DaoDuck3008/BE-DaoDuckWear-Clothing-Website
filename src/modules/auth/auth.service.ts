@@ -124,7 +124,7 @@ export class AuthService {
       );
     }
 
-    const isPasswordValid = await comparePassword(password, user.password!);
+    const isPasswordValid = await comparePassword(password, user.password);
 
     if (!isPasswordValid) {
       throw new UnauthorizedException('Email hoặc mật khẩu không chính xác');
@@ -146,7 +146,7 @@ export class AuthService {
       );
     }
 
-    const role = user.roleId as any;
+    const role = user.roleId;
     if (!role) {
       throw new UnauthorizedException('Tài khoản chưa được gán vai trò');
     }
@@ -279,10 +279,12 @@ export class AuthService {
     try {
       decoded = verifyRefreshToken(refreshToken);
     } catch {
-      throw new UnauthorizedException('Refresh token không hợp lệ hoặc đã hết hạn');
+      throw new UnauthorizedException(
+        'Refresh token không hợp lệ hoặc đã hết hạn',
+      );
     }
 
-    const { id:userId, tokenId } = decoded;
+    const { id: userId, tokenId } = decoded;
 
     const stored = await this.redisService.get(`refresh_token:${tokenId}`);
     if (!stored || stored !== userId) {
@@ -306,7 +308,7 @@ export class AuthService {
       );
     }
 
-    const role = user.roleId as any;
+    const role = user.roleId;
     if (!role) {
       throw new UnauthorizedException('Tài khoản chưa được gán vai trò');
     }
@@ -316,7 +318,9 @@ export class AuthService {
       role: role.name,
       shopId: user.shopId?.id || null,
     });
-    const { token: newRefreshToken, tokenId: newTokenId } = signRefreshToken({ id: user.id });
+    const { token: newRefreshToken, tokenId: newTokenId } = signRefreshToken({
+      id: user.id,
+    });
     await this.redisService.set(
       `refresh_token:${newTokenId}`,
       user.id,
@@ -395,7 +399,7 @@ export class AuthService {
         );
       }
 
-      const role = user.roleId as any;
+      const role = user.roleId;
       if (!role) {
         throw new UnauthorizedException('Tài khoản chưa được gán vai trò');
       }
@@ -405,7 +409,9 @@ export class AuthService {
         role: role.name,
         shopId: user.shopId?.id || null,
       });
-      const { token: refreshToken, tokenId } = signRefreshToken({ id: user.id });
+      const { token: refreshToken, tokenId } = signRefreshToken({
+        id: user.id,
+      });
       await this.redisService.set(
         `refresh_token:${tokenId}`,
         user.id,
@@ -462,7 +468,7 @@ export class AuthService {
       .findByIdAndUpdate(userId, updateQuery, { new: true })
       .populate('roleId');
 
-    const role = updated.roleId as any;
+    const role = updated.roleId;
     return {
       id: updated._id,
       username: updated.username,
@@ -521,7 +527,7 @@ export class AuthService {
       throw new NotFoundException('Không tìm thấy tài khoản');
     }
 
-    const role = user.roleId as any;
+    const role = user.roleId;
     if (!role) {
       throw new UnauthorizedException('Tài khoản chưa được gán vai trò');
     }

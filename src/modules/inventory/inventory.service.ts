@@ -366,8 +366,9 @@ export class InventoryService {
       });
     if (!doc) throw new NotFoundException('Phiếu nhập không tồn tại');
 
-    const shopId =
-      (doc.shopId && doc.shopId._id ? doc.shopId._id : doc.shopId).toString();
+    const shopId = (
+      doc.shopId && doc.shopId._id ? doc.shopId._id : doc.shopId
+    ).toString();
 
     if (user.role !== 'ADMIN') {
       if (!user.shopId || shopId !== user.shopId.toString()) {
@@ -398,7 +399,8 @@ export class InventoryService {
 
     json.items = json.items.map((item: any) => {
       const vid = (
-        item.variantId && (item.variantId.id || item.variantId._id || item.variantId)
+        item.variantId &&
+        (item.variantId.id || item.variantId._id || item.variantId)
       ).toString();
       const inv = invByVariant.get(vid);
       const currentQuantity = inv?.quantity || 0;
@@ -435,10 +437,7 @@ export class InventoryService {
     if (!doc) throw new NotFoundException('Phiếu nhập không tồn tại');
 
     if (user.role !== 'ADMIN') {
-      if (
-        !user.shopId ||
-        doc.shopId.toString() !== user.shopId.toString()
-      ) {
+      if (!user.shopId || doc.shopId.toString() !== user.shopId.toString()) {
         throw new ForbiddenException('Không có quyền thu hồi phiếu nhập này');
       }
     }
@@ -506,9 +505,7 @@ export class InventoryService {
         doc.revokedBy = this.toObjectId(user.id);
         doc.revokedAt = new Date();
         if (dto.note) {
-          doc.note = doc.note
-            ? `${doc.note}\n[Thu hồi] ${dto.note}`
-            : dto.note;
+          doc.note = doc.note ? `${doc.note}\n[Thu hồi] ${dto.note}` : dto.note;
         }
         await doc.save({ session });
       });

@@ -94,7 +94,11 @@ export class CategoriesService {
       action: 'CREATE_CATEGORY',
       entityName: 'Category',
       entityId: category._id,
-      newData: { name: category.name, slug: category.slug, parentId: dto.parentId ?? null },
+      newData: {
+        name: category.name,
+        slug: category.slug,
+        parentId: dto.parentId ?? null,
+      },
     });
 
     return { id: category._id, name: category.name, slug: category.slug };
@@ -121,11 +125,15 @@ export class CategoriesService {
     if ('parentId' in dto) {
       if (dto.parentId) {
         if (dto.parentId === id) {
-          throw new BadRequestException('Danh mục không thể là cha của chính nó');
+          throw new BadRequestException(
+            'Danh mục không thể là cha của chính nó',
+          );
         }
         await this.validateParentId(dto.parentId);
       }
-      updateData.parentId = dto.parentId ? new Types.ObjectId(dto.parentId) : null;
+      updateData.parentId = dto.parentId
+        ? new Types.ObjectId(dto.parentId)
+        : null;
     }
 
     await this.categoryModel.findByIdAndUpdate(id, { $set: updateData });

@@ -12,7 +12,10 @@ import {
   Inventory,
   InventorySchema,
 } from '../inventory/schemas/inventory.schema';
-import { Category, CategorySchema } from '../categories/schemas/category.schema';
+import {
+  Category,
+  CategorySchema,
+} from '../categories/schemas/category.schema';
 import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 
 @Module({
@@ -22,7 +25,7 @@ import { AuditLogsModule } from '../audit-logs/audit-logs.module';
       { name: ProductVariant.name, schema: ProductVariantSchema },
       { name: Shop.name, schema: ShopSchema },
       { name: Inventory.name, schema: InventorySchema },
-      { name: Category.name, schema: CategorySchema},
+      { name: Category.name, schema: CategorySchema },
     ]),
     AuditLogsModule,
   ],

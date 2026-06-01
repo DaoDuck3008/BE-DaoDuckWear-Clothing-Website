@@ -16,8 +16,7 @@ interface OrderCompletedParams {
   reviewUrl: string;
 }
 
-const formatPrice = (p: number) =>
-  p.toLocaleString('vi-VN') + '₫';
+const formatPrice = (p: number) => p.toLocaleString('vi-VN') + '₫';
 
 export const getOrderCompletedHtml = ({
   username,

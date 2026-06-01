@@ -9,7 +9,7 @@ export const createThrottlerOptions = (): ThrottlerModuleOptions => {
     password: process.env.REDIS_PASSWORD || undefined,
     keyPrefix: 'throttle:',
     lazyConnect: true,
-    maxRetriesPerRequest: 0,   // Fail fast thay vì đợi 20 retries mỗi request
+    maxRetriesPerRequest: 0, // Fail fast thay vì đợi 20 retries mỗi request
     enableOfflineQueue: false, // Reject command ngay khi offline, không queue
     retryStrategy: (times) => Math.min(times * 500, 5000), // Vẫn reconnect ngầm
   });
@@ -20,7 +20,7 @@ export const createThrottlerOptions = (): ThrottlerModuleOptions => {
   return {
     throttlers: [{ name: 'global', ttl: 60_000, limit: 60 }],
     storage: new ThrottlerStorageRedisService(redis),
-    // Tạo key dễ đọc khi debug: IP + METHOD + path 
+    // Tạo key dễ đọc khi debug: IP + METHOD + path
     generateKey: (context, tracker, throttlerName) => {
       const req = context.switchToHttp().getRequest();
       const route = req.route?.path ?? req.url;

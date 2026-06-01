@@ -114,8 +114,8 @@ export class UsersService {
   }
 
   private serializeStaff(user: any) {
-    const role = user.roleId as any;
-    const shop = user.shopId as any;
+    const role = user.roleId;
+    const shop = user.shopId;
     return {
       id: user._id?.toString?.() ?? user.id,
       username: user.username,
@@ -321,7 +321,12 @@ export class UsersService {
       action: 'CREATE_STAFF',
       entityName: 'User',
       entityId: created._id,
-      newData: { username: created.username, email: created.email, role: dto.role, shopId: dto.shopId ?? null },
+      newData: {
+        username: created.username,
+        email: created.email,
+        role: dto.role,
+        shopId: dto.shopId ?? null,
+      },
     });
 
     return this.serializeStaff(populated);
@@ -425,7 +430,11 @@ export class UsersService {
       action: 'UPDATE_STAFF',
       entityName: 'User',
       entityId: target._id,
-      oldData: { username: target.username, role: (target.roleId as any)?.name, shopId: (target.shopId as any)?._id?.toString?.() ?? null },
+      oldData: {
+        username: target.username,
+        role: (target.roleId as any)?.name,
+        shopId: (target.shopId as any)?._id?.toString?.() ?? null,
+      },
       newData: updates,
     });
 
@@ -614,19 +623,18 @@ export class UsersService {
     return this.serializeCustomer(user);
   }
 
-  async findCustomerOrders(
-    id: string,
-    page = 1,
-    limit = 5,
-  ) {
+  async findCustomerOrders(id: string, page = 1, limit = 5) {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Mã khách hàng không hợp lệ');
     }
 
     // Đảm bảo user tồn tại & là khách hàng
     const userRoleId = await this.getCustomerRoleId();
-    const exists = await this.userModel
-      .exists({ _id: id, roleId: userRoleId, deletedAt: null });
+    const exists = await this.userModel.exists({
+      _id: id,
+      roleId: userRoleId,
+      deletedAt: null,
+    });
     if (!exists) {
       throw new NotFoundException('Không tìm thấy khách hàng');
     }

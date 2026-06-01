@@ -98,7 +98,7 @@ export class ProductsService {
           { session },
         );
 
-        const createdProduct = product[0] as any;
+        const createdProduct = product[0];
 
         for (const variantDto of variants) {
           const variantPrice = variantDto.price
@@ -140,8 +140,13 @@ export class ProductsService {
       userId: actingUserId,
       action: 'CREATE_PRODUCT',
       entityName: 'Product',
-      entityId: (result as any)?._id,
-      newData: { name: createProductDto.name, slug, basePrice: createProductDto.basePrice, status: createProductDto.status || 'active' },
+      entityId: result?._id,
+      newData: {
+        name: createProductDto.name,
+        slug,
+        basePrice: createProductDto.basePrice,
+        status: createProductDto.status || 'active',
+      },
     });
     return result;
   }
@@ -195,10 +200,14 @@ export class ProductsService {
     const productFilter: any = { deletedAt: null, status: 'active' };
     if (productIds) productFilter._id = { $in: productIds };
     if (categoryId) {
-      const children = await this.categoryModel.find({ parentId: this.toObjectId(categoryId) });
+      const children = await this.categoryModel.find({
+        parentId: this.toObjectId(categoryId),
+      });
       if (children.length > 0) {
         const childrenIds = children.map((c) => this.toObjectId(c._id));
-        productFilter.categoryId = { $in: [this.toObjectId(categoryId), ...childrenIds] };
+        productFilter.categoryId = {
+          $in: [this.toObjectId(categoryId), ...childrenIds],
+        };
       } else {
         productFilter.categoryId = this.toObjectId(categoryId);
       }
@@ -250,10 +259,14 @@ export class ProductsService {
     if (search) filter.name = { $regex: search, $options: 'i' };
     // if (categoryId) filter.categoryId = this.toObjectId(categoryId);
     if (categoryId) {
-      const children = await this.categoryModel.find({ parentId: this.toObjectId(categoryId) });
+      const children = await this.categoryModel.find({
+        parentId: this.toObjectId(categoryId),
+      });
       if (children.length > 0) {
         const childrenIds = children.map((c) => this.toObjectId(c._id));
-        filter.categoryId = { $in: [this.toObjectId(categoryId), ...childrenIds] };
+        filter.categoryId = {
+          $in: [this.toObjectId(categoryId), ...childrenIds],
+        };
       } else {
         filter.categoryId = this.toObjectId(categoryId);
       }
@@ -338,7 +351,7 @@ export class ProductsService {
           .filter((inventory) => inventory.variantId.toString() === variant.id)
           .map((inventory) => {
             const inventoryJson = inventory.toJSON() as Record<string, any>;
-            const shop = inventory.shopId as any;
+            const shop = inventory.shopId;
 
             if (shop) {
               inventoryJson.shop = shop;
@@ -396,10 +409,7 @@ export class ProductsService {
     // 2. Upload ảnh mới (nếu có files)
     let newUploadResults: ProductImage[] = [];
     if (files && files.length > 0) {
-      newUploadResults = await this.cloudinary.uploadProductImages(
-        files as Express.Multer.File[],
-        slug,
-      );
+      newUploadResults = await this.cloudinary.uploadProductImages(files, slug);
     }
 
     // Ghép ảnh cũ còn lại + ảnh mới
@@ -468,7 +478,9 @@ export class ProductsService {
                   ...(v.sku && { sku: v.sku }),
                   ...(v.size && { size: v.size }),
                   ...(v.color && { color: upperColor }),
-                  colorHexId: v.colorHexId ? this.toObjectId(v.colorHexId) : null,
+                  colorHexId: v.colorHexId
+                    ? this.toObjectId(v.colorHexId)
+                    : null,
                   image: variantImage?.url || null,
                   imagePublicId: variantImage?.publicId || null,
                 },
@@ -483,7 +495,9 @@ export class ProductsService {
                     sku: v.sku || `SKU-${Date.now()}-${Math.random()}`,
                     size: v.size,
                     color: upperColor,
-                    colorHexId: v.colorHexId ? this.toObjectId(v.colorHexId) : null,
+                    colorHexId: v.colorHexId
+                      ? this.toObjectId(v.colorHexId)
+                      : null,
                     price: Number(v.price || basePrice),
                     image: variantImage?.url || null,
                     imagePublicId: variantImage?.publicId || null,
@@ -512,7 +526,12 @@ export class ProductsService {
       action: 'UPDATE_PRODUCT',
       entityName: 'Product',
       entityId: id,
-      newData: { name: updateProductDto.name, slug, basePrice: updateProductDto.basePrice, status: updateProductDto.status },
+      newData: {
+        name: updateProductDto.name,
+        slug,
+        basePrice: updateProductDto.basePrice,
+        status: updateProductDto.status,
+      },
     });
     return result;
   }
@@ -589,7 +608,10 @@ export class ProductsService {
     // Stage 1: cùng category con
     if (current.categoryId && results.length < limit) {
       const r = await this.productModel.aggregate(
-        buildPipeline({ categoryId: current.categoryId }, limit - results.length),
+        buildPipeline(
+          { categoryId: current.categoryId },
+          limit - results.length,
+        ),
       );
       results.push(...r);
       excludeIds.push(...r.map((p) => p._id));
@@ -608,7 +630,10 @@ export class ProductsService {
           .lean();
         const sibIds = siblings.map((s) => s._id);
         const r = await this.productModel.aggregate(
-          buildPipeline({ categoryId: { $in: sibIds } }, limit - results.length),
+          buildPipeline(
+            { categoryId: { $in: sibIds } },
+            limit - results.length,
+          ),
         );
         results.push(...r);
         excludeIds.push(...r.map((p) => p._id));

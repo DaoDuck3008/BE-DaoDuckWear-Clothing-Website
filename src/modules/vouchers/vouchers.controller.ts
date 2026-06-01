@@ -25,10 +25,7 @@ export class VouchersController {
 
   @Post('validate')
   @UseGuards(AuthGuard)
-  validateVoucher(
-    @Body() dto: ValidateVoucherDto,
-    @CurrentUser() user: any,
-  ) {
+  validateVoucher(@Body() dto: ValidateVoucherDto, @CurrentUser() user: any) {
     return this.vouchersService.validateAndPreview(
       dto.code,
       dto.orderTotal,
@@ -53,7 +50,11 @@ export class VouchersController {
   @Patch(':id')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles('ADMIN')
-  update(@Param('id') id: string, @Body() dto: UpdateVoucherDto, @CurrentUser() user: any) {
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateVoucherDto,
+    @CurrentUser() user: any,
+  ) {
     return this.vouchersService.update(id, dto, user.id);
   }
 

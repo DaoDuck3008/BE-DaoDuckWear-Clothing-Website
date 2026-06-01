@@ -38,31 +38,21 @@ export class InventoryController {
     return this.inventoryService.findAllInventoryAdmin({ ...query, shopId });
   }
 
-
   @Post('imports')
   @Roles('ADMIN', 'MANAGER', 'STAFF')
-  async createImport(
-    @CurrentUser() user: any,
-    @Body() body: CreateImportDto,
-  ) {
+  async createImport(@CurrentUser() user: any, @Body() body: CreateImportDto) {
     return this.inventoryService.createImport(user, body);
   }
 
   @Get('imports')
   @Roles('ADMIN', 'MANAGER', 'STAFF')
-  async listImports(
-    @CurrentUser() user: any,
-    @Query() query: ListImportsDto,
-  ) {
+  async listImports(@CurrentUser() user: any, @Query() query: ListImportsDto) {
     return this.inventoryService.listImports(user, query);
   }
 
   @Get('imports/:id')
   @Roles('ADMIN', 'MANAGER', 'STAFF')
-  async getImportDetail(
-    @CurrentUser() user: any,
-    @Param('id') id: string,
-  ) {
+  async getImportDetail(@CurrentUser() user: any, @Param('id') id: string) {
     return this.inventoryService.getImportDetail(user, id);
   }
 

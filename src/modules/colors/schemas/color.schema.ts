@@ -4,7 +4,10 @@ import { applyIdVirtual } from '../../../common/utils/mongoose-schema.util';
 
 export type ColorDocument = HydratedDocument<Color>;
 
-@Schema({ timestamps: { createdAt: true, updatedAt: false }, collection: 'colors' })
+@Schema({
+  timestamps: { createdAt: true, updatedAt: false },
+  collection: 'colors',
+})
 export class Color {
   @Prop({ type: String, required: true, trim: true })
   name!: string;

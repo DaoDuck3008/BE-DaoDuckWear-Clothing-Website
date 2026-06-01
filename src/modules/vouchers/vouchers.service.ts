@@ -40,10 +40,7 @@ export class VouchersService {
     }
 
     if (voucher.expiredAt && new Date() > new Date(voucher.expiredAt)) {
-      throw new BusinessException(
-        'Mã giảm giá đã hết hạn',
-        'VOUCHER_EXPIRED',
-      );
+      throw new BusinessException('Mã giảm giá đã hết hạn', 'VOUCHER_EXPIRED');
     }
 
     if (
@@ -117,7 +114,10 @@ export class VouchersService {
     }
   }
 
-  async create(dto: CreateVoucherDto, actingUserId?: string): Promise<VoucherDocument> {
+  async create(
+    dto: CreateVoucherDto,
+    actingUserId?: string,
+  ): Promise<VoucherDocument> {
     const existing = await this.voucherModel.findOne({
       code: dto.code,
       deletedAt: null,
@@ -136,7 +136,11 @@ export class VouchersService {
       action: 'CREATE_VOUCHER',
       entityName: 'Voucher',
       entityId: voucher._id,
-      newData: { code: voucher.code, discountType: voucher.discountType, discountValue: voucher.discountValue },
+      newData: {
+        code: voucher.code,
+        discountType: voucher.discountType,
+        discountValue: voucher.discountValue,
+      },
     });
     return voucher;
   }
@@ -193,8 +197,15 @@ export class VouchersService {
     };
   }
 
-  async update(id: string, dto: UpdateVoucherDto, actingUserId?: string): Promise<VoucherDocument> {
-    const voucher = await this.voucherModel.findOne({ _id: id, deletedAt: null });
+  async update(
+    id: string,
+    dto: UpdateVoucherDto,
+    actingUserId?: string,
+  ): Promise<VoucherDocument> {
+    const voucher = await this.voucherModel.findOne({
+      _id: id,
+      deletedAt: null,
+    });
     if (!voucher) throw new NotFoundException('Voucher không tồn tại');
 
     const updateData: any = { ...dto };
@@ -215,7 +226,10 @@ export class VouchersService {
   }
 
   async softDelete(id: string, actingUserId?: string): Promise<void> {
-    const voucher = await this.voucherModel.findOne({ _id: id, deletedAt: null });
+    const voucher = await this.voucherModel.findOne({
+      _id: id,
+      deletedAt: null,
+    });
     if (!voucher) throw new NotFoundException('Voucher không tồn tại');
     voucher.deletedAt = new Date();
     await voucher.save();

@@ -7,7 +7,11 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Review, ReviewDocument } from './schemas/review.schema';
-import { Order, OrderDocument, OrderStatus } from '../orders/schemas/order.schema';
+import {
+  Order,
+  OrderDocument,
+  OrderStatus,
+} from '../orders/schemas/order.schema';
 import { CreateReviewDto, UpdateReviewDto } from './dto/review.dto';
 
 @Injectable()
@@ -19,7 +23,10 @@ export class ReviewsService {
 
   async getProductReviews(productId: string, page = 1, limit = 10) {
     const skip = (page - 1) * limit;
-    const filter = { productId: new Types.ObjectId(productId), deletedAt: null };
+    const filter = {
+      productId: new Types.ObjectId(productId),
+      deletedAt: null,
+    };
 
     const [reviews, total] = await Promise.all([
       this.reviewModel
@@ -71,7 +78,8 @@ export class ReviewsService {
       };
     }
 
-    const { averageRating, totalCount, dist1, dist2, dist3, dist4, dist5 } = result[0];
+    const { averageRating, totalCount, dist1, dist2, dist3, dist4, dist5 } =
+      result[0];
     return {
       averageRating: Math.round(averageRating * 10) / 10,
       totalCount,
@@ -89,7 +97,9 @@ export class ReviewsService {
     });
 
     if (!hasPurchased) {
-      throw new ForbiddenException('Bạn cần mua và hoàn thành đơn hàng sản phẩm này trước khi đánh giá');
+      throw new ForbiddenException(
+        'Bạn cần mua và hoàn thành đơn hàng sản phẩm này trước khi đánh giá',
+      );
     }
 
     const existing = await this.reviewModel.findOne({

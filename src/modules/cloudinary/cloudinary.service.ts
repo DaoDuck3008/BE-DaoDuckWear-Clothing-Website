@@ -72,9 +72,7 @@ export class CloudinaryService {
     if (!files || files.length === 0) return [];
 
     const uploadPromises = files.map(async (file, i) => {
-      const fieldname = Buffer.from(file.fieldname, 'latin1').toString(
-        'utf8',
-      ); // Lấy tên file từ form-data. Đổi kiểu latin1 -> utf8 để tránh lỗi tiếng Việt
+      const fieldname = Buffer.from(file.fieldname, 'latin1').toString('utf8'); // Lấy tên file từ form-data. Đổi kiểu latin1 -> utf8 để tránh lỗi tiếng Việt
 
       let color: string | null = null;
       let isMain = false;

@@ -104,7 +104,12 @@ export class BannersService {
       action: 'CREATE_BANNER',
       entityName: 'Banner',
       entityId: banner._id,
-      newData: { title: (banner as any).title, page: (banner as any).page, position: (banner as any).position, isActive: (banner as any).isActive },
+      newData: {
+        title: (banner as any).title,
+        page: (banner as any).page,
+        position: (banner as any).position,
+        isActive: (banner as any).isActive,
+      },
     });
 
     return banner.toJSON();
@@ -129,8 +134,10 @@ export class BannersService {
       if (banner.publicId) {
         await this.cloudinaryService.deleteBannerImage(banner.publicId);
       }
-      const { url, publicId } =
-        await this.cloudinaryService.uploadBannerImage(imageFile, 'desktop');
+      const { url, publicId } = await this.cloudinaryService.uploadBannerImage(
+        imageFile,
+        'desktop',
+      );
       updateData.imageUrl = url;
       updateData.publicId = publicId;
     }
@@ -140,8 +147,10 @@ export class BannersService {
       if (banner.mobilePublicId) {
         await this.cloudinaryService.deleteBannerImage(banner.mobilePublicId);
       }
-      const { url, publicId } =
-        await this.cloudinaryService.uploadBannerImage(mobileFile, 'mobile');
+      const { url, publicId } = await this.cloudinaryService.uploadBannerImage(
+        mobileFile,
+        'mobile',
+      );
       updateData.mobileImageUrl = url;
       updateData.mobilePublicId = publicId;
     }
