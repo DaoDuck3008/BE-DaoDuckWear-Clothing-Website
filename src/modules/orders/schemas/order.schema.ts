@@ -122,6 +122,9 @@ export class Order {
   @Prop({ type: Date, default: null })
   paidAt?: Date | null;
 
+  @Prop({ type: String, default: null })
+  transactionId?: string | null;
+
   @Prop({ type: Date, default: null })
   deletedAt?: Date | null;
 }

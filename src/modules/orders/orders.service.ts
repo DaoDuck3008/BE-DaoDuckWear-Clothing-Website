@@ -2,7 +2,9 @@ import {
   Injectable,
   BadRequestException,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectModel, InjectConnection } from '@nestjs/mongoose';
 import { Model, Connection, Types } from 'mongoose';
 import {
@@ -32,6 +34,8 @@ import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 @Injectable()
 export class OrdersService {
+  private readonly logger = new Logger(OrdersService.name);
+
   constructor(
     @InjectModel(Order.name) private orderModel: Model<OrderDocument>,
     @InjectModel(Product.name) private productModel: Model<ProductDocument>,
@@ -189,6 +193,89 @@ export class OrdersService {
       throw error;
     } finally {
       session.endSession();
+    }
+  }
+
+  /**
+   * Tự động hủy đơn VNPAY chưa thanh toán quá hạn (mặc định 20 phút).
+   * VNPay hết hạn giao dịch sau 15 phút; sau 20 phút coi như user bỏ dở
+   * hủy đơn và giải phóng tồn kho đã giữ (reservedQuantity).
+   */
+  @Cron(CronExpression.EVERY_5_MINUTES)
+  async autoCancelExpiredVnpayOrders() {
+    const EXPIRE_MINUTES = 20;
+    const cutoff = new Date(Date.now() - EXPIRE_MINUTES * 60 * 1000);
+
+    const expiredOrders = await this.orderModel
+      .find({
+        paymentMethod: 'VNPAY',
+        paymentStatus: PaymentStatus.UNPAID,
+        status: OrderStatus.PENDING,
+        createdAt: { $lt: cutoff },
+      })
+      .select('_id orderCode')
+      .lean();
+
+    if (expiredOrders.length === 0) return;
+
+    let cancelledCount = 0;
+    for (const expired of expiredOrders) {
+      const session = await this.connection.startSession();
+      session.startTransaction();
+      try {
+        // Claim atomic: chỉ xử lý nếu đơn VẪN PENDING + UNPAID
+        // (chống race khi IPN/return cập nhật PAID đúng lúc cron chạy)
+        const order = await this.orderModel
+          .findOne({
+            _id: expired._id,
+            status: OrderStatus.PENDING,
+            paymentStatus: PaymentStatus.UNPAID,
+          })
+          .session(session);
+
+        if (!order) {
+          await session.abortTransaction();
+          continue;
+        }
+
+        for (const item of order.items) {
+          await this.inventoryModel.updateOne(
+            { variantId: item.variantId, shopId: item.shopId },
+            { $inc: { reservedQuantity: -item.quantity } },
+            { session },
+          );
+        }
+        order.status = OrderStatus.CANCELLED;
+        await order.save({ session });
+        await session.commitTransaction();
+        cancelledCount++;
+
+        void this.auditLogsService.log({
+          action: 'AUTO_CANCEL_ORDER',
+          entityName: 'Order',
+          entityId: order._id,
+          oldData: { orderCode: order.orderCode, status: OrderStatus.PENDING },
+          newData: {
+            orderCode: order.orderCode,
+            status: OrderStatus.CANCELLED,
+            reason: 'VNPAY payment timeout',
+          },
+        });
+      } catch (error) {
+        await session.abortTransaction();
+        this.logger.error(
+          `Tự động hủy đơn ${expired.orderCode} thất bại`,
+          error as Error,
+        );
+      } finally {
+        session.endSession();
+      }
+    }
+
+    if (cancelledCount > 0) {
+      this.logger.log(
+        `Đã tự động hủy ${cancelledCount} đơn VNPAY quá hạn thanh toán`,
+      );
     }
   }
 

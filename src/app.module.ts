@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { ResilientThrottlerGuard } from './common/guards/resilient-throttler.guard';
@@ -26,10 +27,12 @@ import { ReviewsModule } from './modules/reviews/reviews.module';
 import { VouchersModule } from './modules/vouchers/vouchers.module';
 import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 import { ChatModule } from './modules/chat/chat.module';
+import { PaymentsModule } from './modules/payments/payments.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
+    ScheduleModule.forRoot(),
     DatabaseModule,
     RedisModule,
     ThrottlerModule.forRoot(createThrottlerOptions()),
@@ -53,6 +56,7 @@ import { ChatModule } from './modules/chat/chat.module';
     VouchersModule,
     AuditLogsModule,
     ChatModule,
+    PaymentsModule,
   ],
   controllers: [],
   providers: [{ provide: APP_GUARD, useClass: ResilientThrottlerGuard }],
