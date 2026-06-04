@@ -3,6 +3,8 @@ import {
   IsBooleanString,
   IsIn,
   IsInt,
+  IsMongoId,
+  IsNotEmpty,
   IsOptional,
   IsString,
   Max,
@@ -42,6 +44,12 @@ export class ListCustomerQueryDto {
   @Min(1)
   @Max(100)
   limit?: number = 10;
+}
+
+export class PromoteToStaffDto {
+  @IsMongoId({ message: 'Chi nhánh không hợp lệ' })
+  @IsNotEmpty({ message: 'Vui lòng chọn chi nhánh' })
+  shopId!: string;
 }
 
 export class ListCustomerOrdersQueryDto {

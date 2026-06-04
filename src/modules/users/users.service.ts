@@ -160,8 +160,8 @@ export class UsersService {
           'Tài khoản MANAGER chưa được gán chi nhánh',
         );
       }
-      // MANAGER chỉ thấy MANAGER + STAFF trong chính shop của họ
-      roleIdsScope = (['MANAGER', 'STAFF'] as StaffRoleName[])
+      // MANAGER chỉ thấy MANAGER + RECEPTIONIST + STAFF trong chính shop của họ
+      roleIdsScope = (['MANAGER', 'RECEPTIONIST', 'STAFF'] as StaffRoleName[])
         .map((n) => byName.get(n)?._id)
         .filter(Boolean) as Types.ObjectId[];
       filter.shopId = new Types.ObjectId(actor.shopId);
@@ -205,17 +205,31 @@ export class UsersService {
       ];
     }
 
-    const [items, total] = await Promise.all([
-      this.userModel
-        .find(filter)
-        .populate('roleId', 'name _id')
-        .populate('shopId', 'name _id')
-        .sort({ createdAt: -1 })
-        .skip((page - 1) * limit)
-        .limit(limit)
-        .lean(),
-      this.userModel.countDocuments(filter),
-    ]);
+    const ROLE_PRIORITY: Record<string, number> = {
+      ADMIN: 0,
+      MANAGER: 1,
+      RECEPTIONIST: 2,
+      STAFF: 3,
+    };
+
+    const allItems = await this.userModel
+      .find(filter)
+      .populate('roleId', 'name _id')
+      .populate('shopId', 'name _id')
+      .lean();
+
+    allItems.sort((a, b) => {
+      const pa = ROLE_PRIORITY[(a.roleId as any)?.name ?? ''] ?? 4;
+      const pb = ROLE_PRIORITY[(b.roleId as any)?.name ?? ''] ?? 4;
+      if (pa !== pb) return pa - pb;
+      return (
+        new Date(b.createdAt as any).getTime() -
+        new Date(a.createdAt as any).getTime()
+      );
+    });
+
+    const total = allItems.length;
+    const items = allItems.slice((page - 1) * limit, page * limit);
 
     return {
       data: items.map((u) => this.serializeStaff(u)),
@@ -451,25 +465,32 @@ export class UsersService {
       throw new BadRequestException('Bạn không thể tự xóa tài khoản của mình');
     }
 
-    const target = await this.userModel.findOne({
-      _id: id,
-      deletedAt: null,
-    });
-
+    const target = await this.userModel.findOne({ _id: id, deletedAt: null });
     if (!target) {
       throw new NotFoundException('Không tìm thấy nhân viên');
     }
 
+    const userRole = await this.roleModel.findOne({ name: 'USER' }).lean();
+    if (!userRole) {
+      throw new NotFoundException('Không tìm thấy vai trò USER');
+    }
+
     await this.userModel.findByIdAndUpdate(target._id, {
-      $set: { deletedAt: new Date() },
+      $set: {
+        roleId: userRole._id,
+        shopId: null,
+        employmentStatus: null,
+        position: null,
+      },
     });
 
     void this.auditLogsService.log({
       userId: actor.id,
-      action: 'DELETE_STAFF',
+      action: 'DEMOTE_STAFF',
       entityName: 'User',
       entityId: target._id,
       oldData: { username: target.username, email: target.email },
+      newData: { role: 'USER' },
     });
 
     return { success: true };
@@ -675,6 +696,92 @@ export class UsersService {
       page: safePage,
       limit: safeLimit,
     };
+  }
+
+  async getCustomerStats() {
+    const userRoleId = await this.getCustomerRoleId();
+    const base = { roleId: userRoleId, deletedAt: null };
+    const [total, active, locked, unverified] = await Promise.all([
+      this.userModel.countDocuments(base),
+      this.userModel.countDocuments({ ...base, isVerified: true, isLocked: false }),
+      this.userModel.countDocuments({ ...base, isLocked: true }),
+      this.userModel.countDocuments({ ...base, isVerified: false }),
+    ]);
+    return { total, active, locked, unverified };
+  }
+
+  async getStaffStats() {
+    const { byName, allIds } = await this.getStaffRoleMap();
+    const base = { deletedAt: null };
+    const adminRole = byName.get('ADMIN');
+    const managerRole = byName.get('MANAGER');
+    const staffRole = byName.get('STAFF');
+    const receptionistRole = byName.get('RECEPTIONIST');
+    const frontlineIds = [staffRole?._id, receptionistRole?._id].filter(
+      Boolean,
+    );
+
+    const [total, admin, manager, frontline] = await Promise.all([
+      this.userModel.countDocuments({ ...base, roleId: { $in: allIds } }),
+      adminRole
+        ? this.userModel.countDocuments({ ...base, roleId: adminRole._id })
+        : Promise.resolve(0),
+      managerRole
+        ? this.userModel.countDocuments({ ...base, roleId: managerRole._id })
+        : Promise.resolve(0),
+      frontlineIds.length
+        ? this.userModel.countDocuments({
+            ...base,
+            roleId: { $in: frontlineIds },
+          })
+        : Promise.resolve(0),
+    ]);
+
+    return { total, admin, manager, frontline };
+  }
+
+  async promoteCustomerToStaff(id: string, shopId: string, actorId: string) {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('Mã khách hàng không hợp lệ');
+    }
+    if (!Types.ObjectId.isValid(shopId)) {
+      throw new BadRequestException('Chi nhánh không hợp lệ');
+    }
+
+    const userRoleId = await this.getCustomerRoleId();
+    const staffRole = await this.roleModel.findOne({ name: 'STAFF' }).lean();
+    if (!staffRole) {
+      throw new NotFoundException('Không tìm thấy vai trò STAFF');
+    }
+
+    const customer = await this.userModel.findOne({
+      _id: id,
+      roleId: userRoleId,
+      deletedAt: null,
+    });
+    if (!customer) {
+      throw new NotFoundException('Không tìm thấy khách hàng');
+    }
+
+    await this.userModel.findByIdAndUpdate(customer._id, {
+      $set: {
+        roleId: staffRole._id,
+        shopId: new Types.ObjectId(shopId),
+        employmentStatus: 'active',
+        isVerified: true,
+      },
+    });
+
+    void this.auditLogsService.log({
+      userId: actorId,
+      action: 'PROMOTE_CUSTOMER_TO_STAFF',
+      entityName: 'User',
+      entityId: customer._id,
+      oldData: { role: 'USER' },
+      newData: { role: 'STAFF', shopId },
+    });
+
+    return { success: true };
   }
 
   async setCustomerLock(id: string, locked: boolean, actingUserId?: string) {

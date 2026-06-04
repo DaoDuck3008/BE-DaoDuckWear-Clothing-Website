@@ -22,6 +22,7 @@ import {
 import {
   ListCustomerOrdersQueryDto,
   ListCustomerQueryDto,
+  PromoteToStaffDto,
 } from './dto/customer.dto';
 
 interface AuthUserPayload {
@@ -49,6 +50,13 @@ export class UsersController {
     @CurrentUser() user: AuthUserPayload,
   ) {
     return this.usersService.findAllStaff(query, user);
+  }
+
+  @Get('staff/stats')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async getStaffStats() {
+    return this.usersService.getStaffStats();
   }
 
   @Get('staff/:id')
@@ -111,6 +119,13 @@ export class UsersController {
     return this.usersService.findAllCustomers(query);
   }
 
+  @Get('customers/stats')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async getCustomerStats() {
+    return this.usersService.getCustomerStats();
+  }
+
   @Get('customers/:id')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles('ADMIN')
@@ -130,6 +145,17 @@ export class UsersController {
       query.page ?? 1,
       query.limit ?? 5,
     );
+  }
+
+  @Patch('customers/:id/promote-to-staff')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async promoteCustomerToStaff(
+    @Param('id') id: string,
+    @Body() dto: PromoteToStaffDto,
+    @CurrentUser() user: AuthUserPayload,
+  ) {
+    return this.usersService.promoteCustomerToStaff(id, dto.shopId, user.id);
   }
 
   @Patch('customers/:id/lock')
